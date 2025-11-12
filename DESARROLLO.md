@@ -16,19 +16,25 @@ Este documento contiene el plan de trabajo técnico, checklist de tareas y regis
 
 ---
 
-## Fase 1: Infraestructura de Datos
+## Fase 1: Infraestructura de Datos (ACTUALIZADA)
 
 ### Objetivos
-Construir la base del sistema de persistencia y acceso a datos, abstrayendo completamente la lógica de fetch desde GitHub y el manejo de archivos locales.
+Construir la base del sistema de persistencia y acceso a datos con abstracción completa de fuentes externas (GitHub, Mongo, etc.) y manejo de archivos locales como fallback.
 
 ### Tareas
-- [ ] Cliente para descargar datos desde GitHub
-- [ ] Definir estructuras de datos principales (ingredientes, hot dogs, inventario, ventas)
+- [x] Clase abstracta para clientes de fuentes externas (`ExternalSourceClient`)
+- [x] Cliente de GitHub que implementa la interfaz abstracta
+- [x] Cliente de fuente de datos (`DataSourceClient`) que:
+  - [x] Acepta múltiples fuentes externas (una por colección)
+  - [x] Maneja fallback automático a archivos locales
+  - [x] Almacena datos en memoria para acceso rápido
+  - [x] Persiste cambios en archivos JSON locales
+- [x] Sistema de configuración con variables de entorno (`.env`)
+- [ ] Definir estructuras de datos (Models con dataclasses)
 - [ ] Sistema de colecciones genérico con operaciones CRUD
 - [ ] Colecciones especializadas por tipo de dato
-- [ ] Handler central que orqueste carga desde GitHub y archivos locales
-- [ ] Archivo de configuración con constantes del proyecto
-- [ ] Testing manual del flujo completo de datos
+- [ ] Handler central que orqueste todas las colecciones
+- [ ] Testing manual del flujo completo
 
 ---
 
@@ -113,4 +119,55 @@ Completar documentación, probar
 
 ---
 
+
+## Notas de Desarrollo - Fase 1
+
+### Abstracción de Fuentes Externas
+**Implementación:** Creada una arquitectura pluggable donde cada fuente de datos externa (GitHub, MongoDB, BigQuery, etc.) implementa la interfaz `ExternalSourceClient` con un método `fetch_data(identifier, **kwargs)`. Esto permite:
+- Cambiar la fuente de datos sin modificar el código del cliente
+- Usar diferentes fuentes para diferentes colecciones (ej: ingredientes de GitHub, ventas de MongoDB)
+- Extensibilidad: agregar nuevas fuentes solo requiere implementar la interfaz
+
+**Estructura:**
+```
+ExternalSourceClient (Abstract)
+    ├── GitHubClient
+    ├── MongoClient (Si se quisiera extender)
+    └── CualquierFuenteExternaClient (Si se quisiera extender)
+```
+
+### DataSourceClient
+**Decisión:** El `DataSourceClient` acepta un diccionario `{nombre_colección: external_client}` en su método `initialize()`. Esto permite máxima flexibilidad:
+```python
+data_source.initialize({
+    'ingredientes': github_client,
+    'menu': github_client,
+    'ventas': mongo_client  # Diferente fuente
+})
+```
+
+**Flujo de datos:**
+1. Intenta cargar desde archivos locales (cache)
+2. Si no existe o se fuerza con `force_external=True`, descarga de fuente externa
+3. Guarda automáticamente en local como fallback
+4. Todo queda en memoria (`_data_store`) para acceso rápido
+5. Método `save()` actualiza memoria + persiste en archivo local
+
+**TODO:** Cuando se implementen Collections, refactorizar para que cada Collection encapsule su fuente externa en lugar de pasar diccionarios de strings.
+
+### Configuración con Environment Variables
+**Implementación:** Usamos `python-dotenv` para manejar configuración sensible:
+- `.env` → valores reales (ignorado por git)
+- `.env.example` → plantilla versionada
+- `config.py` → carga y expone las variables
+
+**Ventajas:**
+- No commitear credenciales
+- Fácil cambiar configuración entre ambientes (dev/prod)
+- Valores por defecto en `config.py` como fallback
+
+
+
+
 **Última actualización**: [NOV 12, 2025] - [Rafael Correa]
+

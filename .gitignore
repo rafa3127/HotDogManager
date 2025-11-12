@@ -39,10 +39,16 @@ venv/
 Thumbs.db
 
 # Datos locales del proyecto
-data/*.json
+data
 
 # Gráficos generados
 data/graficos/
 
 # Logs
 *.log
+
+
+# Environment Variables
+.env
+.env.*
+!.env.example

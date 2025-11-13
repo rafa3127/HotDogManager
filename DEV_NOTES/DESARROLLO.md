@@ -31,10 +31,10 @@ Construir la base del sistema de persistencia y acceso a datos con abstracción 
   - [x] Persiste cambios en archivos JSON locales
 - [x] Sistema de configuración con variables de entorno (`.env`)
 - [ ] Sistema genérico de entidades con Plugin Architecture:
-  - [ ] Core genérico reutilizable para cualquier dominio
-  - [ ] Clase base `Entity` (independiente del dominio)
-  - [ ] `MethodRegistry` (registro centralizado de métodos/validadores)
-  - [ ] `EntityFactory` (generador de clases dinámicas)
+  - [x] Core genérico reutilizable para cualquier dominio
+  - [x] Clase base `Entity` (independiente del dominio)
+  - [x] `MethodRegistry` (registro centralizado de métodos/validadores)
+  - [x] `EntityFactory` (generador de clases dinámicas)
   - [ ] Schemas por tipo de entidad (Ingredientes, HotDogs, Ventas)
   - [ ] Plugins por entidad específica
   - [ ] Exportar entidades generadas

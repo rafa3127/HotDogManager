@@ -9,7 +9,7 @@ Author: Rafael Correa
 Date: November 13, 2025
 """
 
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, List
 
 
 class MethodRegistry:
@@ -48,21 +48,6 @@ class MethodRegistry:
         cls._methods[entity_type][method_name] = func
     
     @classmethod
-    def register_validator(cls, entity_type: str, func: Callable) -> None:
-        """
-        Register a validator function for a specific entity type.
-        
-        The validator will replace the default validate() method in the entity.
-        Should raise ValueError if validation fails, return True if valid.
-        
-        Args:
-            entity_type: Type of entity
-            func: Validator function that accepts 'self' as parameter
-                  Should raise ValueError on validation failure
-        """
-        cls._validators[entity_type] = func
-    
-    @classmethod
     def get_methods(cls, entity_type: str) -> Dict[str, Callable]:
         """
         Get all registered methods for an entity type.
@@ -75,32 +60,50 @@ class MethodRegistry:
             Empty dict if no methods registered
         """
         return cls._methods.get(entity_type, {})
+
+    @classmethod
+    def register_validator(cls, entity_type: str, func: Callable) -> None:
+        """
+        Register a validator for a specific entity type.
+        
+        Multiple validators can be registered for the same entity type.
+        They will be executed in order of registration.
+        """
+        if entity_type not in cls._validators:
+            cls._validators[entity_type] = []
+        
+        cls._validators[entity_type].append(func)
+    
+    @classmethod
+    def get_validators(cls, entity_type: str) -> List[Callable]:
+        """
+        Get all registered validators for an entity type.
+        
+        Returns:
+            List of validator functions (may be empty)
+        """
+        return cls._validators.get(entity_type, [])
     
     @classmethod
     def get_validator(cls, entity_type: str) -> Optional[Callable]:
         """
-        Get validator for an entity type.
-        
-        Args:
-            entity_type: Type of entity
+        Get composed validator that runs all registered validators.
         
         Returns:
-            Validator function if registered, None otherwise
+            Single function that runs all validators in sequence, or None
         """
-        return cls._validators.get(entity_type)
-    
-    @classmethod
-    def has_methods(cls, entity_type: str) -> bool:
-        """
-        Check if entity type has any registered methods.
+        validators = cls.get_validators(entity_type)
         
-        Args:
-            entity_type: Type of entity
+        if not validators:
+            return None
         
-        Returns:
-            True if entity has registered methods
-        """
-        return entity_type in cls._methods and len(cls._methods[entity_type]) > 0
+        # Compose all validators into one function
+        def composed_validator(self) -> bool:
+            for validator in validators:
+                validator(self)  # Raises ValueError if fails
+            return True
+        
+        return composed_validator
     
     @classmethod
     def has_validator(cls, entity_type: str) -> bool:

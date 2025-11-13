@@ -16,10 +16,10 @@ Este documento contiene el plan de trabajo técnico, checklist de tareas y regis
 
 ---
 
-## Fase 1: Infraestructura de Datos (ACTUALIZADA)
+## Fase 1: Infraestructura de Datos
 
 ### Objetivos
-Construir la base del sistema de persistencia y acceso a datos con abstracción completa de fuentes externas (GitHub, Mongo, etc.) y manejo de archivos locales como fallback.
+Construir la base del sistema de persistencia y acceso a datos con abstracción completa de fuentes externas y sistema de plugins genérico para cualquier tipo de entidad del dominio.
 
 ### Tareas
 - [x] Clase abstracta para clientes de fuentes externas (`ExternalSourceClient`)
@@ -30,7 +30,14 @@ Construir la base del sistema de persistencia y acceso a datos con abstracción 
   - [x] Almacena datos en memoria para acceso rápido
   - [x] Persiste cambios en archivos JSON locales
 - [x] Sistema de configuración con variables de entorno (`.env`)
-- [ ] Definir estructuras de datos (Models con dataclasses)
+- [ ] Sistema genérico de entidades con Plugin Architecture:
+  - [ ] Core genérico reutilizable para cualquier dominio
+  - [ ] Clase base `Entity` (independiente del dominio)
+  - [ ] `MethodRegistry` (registro centralizado de métodos/validadores)
+  - [ ] `EntityFactory` (generador de clases dinámicas)
+  - [ ] Schemas por tipo de entidad (Ingredientes, HotDogs, Ventas)
+  - [ ] Plugins por entidad específica
+  - [ ] Exportar entidades generadas
 - [ ] Sistema de colecciones genérico con operaciones CRUD
 - [ ] Colecciones especializadas por tipo de dato
 - [ ] Handler central que orqueste todas las colecciones
@@ -165,6 +172,108 @@ data_source.initialize({
 - No commitear credenciales
 - Fácil cambiar configuración entre ambientes (dev/prod)
 - Valores por defecto en `config.py` como fallback
+
+### Sistema Genérico de Entidades con Plugin Architecture
+
+**Decisión:** Implementamos un sistema completamente genérico de entidades reutilizable para cualquier dominio (Hot Dogs, tienda de mascotas, biblioteca, etc.) usando Plugin Architecture con Registry Pattern.
+
+**Arquitectura de 3 Capas:**
+
+1. **Core (genérico y reutilizable)**:
+   - `Entity`: Clase base ultra-genérica con solo id y entity_type
+   - `MethodRegistry`: Sistema centralizado de registro de métodos/validadores
+   - `EntityFactory`: Generador de clases dinámicas con inyección de métodos
+
+2. **Domain (específico del proyecto)**:
+   - `Schemas`: Definen qué propiedades tiene cada tipo de entidad
+   - `Plugins`: Registran métodos y validadores específicos de cada entidad
+
+3. **Generated (output del sistema)**:
+   - Clases concretas generadas (Pan, HotDog)
+
+**Flujo de ejecución:**
+1. Al importar plugins, se ejecutan los registros en `MethodRegistry`
+2. Al importar entities, el factory:
+   - Lee los schemas
+   - Genera clases con `make_dataclass()`
+   - Inyecta métodos y validadores del registry usando `setattr()`
+3. Las clases generadas se exportan desde `models/__init__.py`
+4. El resto del sistema usa estas clases sin saber que fueron generadas
+
+**Estructura de directorios:**
+```
+models/
+├── core/                       # ← Genérico, portable a otros proyectos
+│   ├── base_entity.py         
+│   ├── method_registry.py     
+│   └── entity_factory.py      
+├── schemas/                    # ← Específico del dominio
+│   ├── ingredient_schemas.py
+│   ├── hotdog_schemas.py
+│   └── sale_schemas.py
+├── plugins/                    # ← Específico del dominio
+│   ├── ingredients/
+│   ├── hotdogs/
+│   └── sales/
+├── entities/                   # ← Generado, exportable
+│   ├── ingredients.py
+│   ├── hotdogs.py
+└── __init__.py
+```
+
+**Ventajas:**
+
+*Para el proyecto actual:*
+- Reutilizamos la misma infraestructura para ingredientes, hot dogs, ventas, inventario
+- Menos código
+- Consistencia: todas las entidades funcionan igual
+
+*Para reutilización futura:*
+- El core (Entity, MethodRegistry, EntityFactory) es 100% portable
+- Cambiar de dominio = cambiar schemas y plugins solamente
+- Ejemplo: Tienda de mascotas solo requiere crear `pet_schemas.py` y `pet_plugins/`
+
+*Para evaluación académica:*
+- Demuestra arquitectura de software avanzada
+- Máxima separación de concerns
+- Extensibilidad sin modificar código existente (Open/Closed Principle)
+
+**Trade-offs:**
+- Mayor complejidad inicial
+- Curva de aprendizaje más pronunciada para entender el sistema
+- Debugging requiere entender la inyección dinámica
+
+**Conceptos de POO y Patrones aplicados:**
+- **Registry Pattern**: MethodRegistry centraliza registro de funcionalidad
+- **Plugin Architecture**: Extensibilidad mediante plugins desacoplados
+- **Factory Pattern**: EntityFactory genera clases bajo demanda
+- **Metaprogramming**: Creación y modificación de clases en runtime
+- **Reflection**: Inspección y modificación dinámica (`setattr`, `getattr`)
+- **Dynamic Method Injection**: Agregar métodos después de crear clase
+- **Dataclasses**: Generación automática de métodos especiales
+- **Inversion of Control**: El registry controla qué funcionalidad tiene cada clase
+- **Open/Closed Principle**: Abierto a extensión (nuevos plugins), cerrado a modificación (core no cambia)
+- **Separation of Concerns**: Core, schemas y plugins están completamente desacoplados
+- **Single Responsibility**: Cada componente tiene una única responsabilidad
+- **Dependency Injection**: Factory recibe dependencies (schemas, registry)
+
+**Reutilización del código:**
+El módulo `models/core/` completo puede extraerse y usarse en:
+- Sistema de biblioteca (Book, Author, Loan)
+- Tienda de mascotas (Pet, Owner, Appointment)
+- Sistema de inventario genérico
+- CRM (Customer, Lead, Opportunity)
+- Cualquier dominio que necesite entidades dinámicas
+
+**Justificación académica:** 
+Este diseño va más allá de herencia básica y demuestra:
+1. Comprensión profunda de POO avanzada
+2. Conocimiento de patrones de diseño profesionales
+3. Capacidad de abstraer y generalizar soluciones
+4. Pensamiento arquitectónico para sistemas escalables y mantenibles
+5. Aplicación de principios SOLID
+
+El sistema es funcionalmente idéntico a usar clases normales, pero arquitectónicamente superior para extensibilidad y mantenimiento a largo plazo.
 
 
 

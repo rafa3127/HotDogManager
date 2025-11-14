@@ -3,7 +3,7 @@ Temporary testing file for datasource and ID system.
 
 Author: Rafael Correa
 Date: November 12, 2025
-Updated: November 14, 2025 - Added ID adapter tests
+Updated: November 14, 2025 - Added ID adapter tests and Key Normalization tests
 """
 
 import sys
@@ -16,6 +16,11 @@ from clients.external_sources.external_source_client import ExternalSourceClient
 from clients.external_sources.github_client import GitHubClient
 from clients.data_source_client import DataSourceClient
 from clients.adapters.id_adapter import IDAdapter
+from clients.adapters.key_normalization_adapter import (
+    KeyNormalizationAdapter,
+    normalize_key,
+    normalize_keys_recursive
+)
 from clients.id_processors import (
     generate_stable_id,
     process_grouped_structure_ids,
@@ -70,6 +75,12 @@ def test_github_client():
             print(f"   ⚠️  Warning: Data already has IDs (expected raw data without IDs)")
         else:
             print(f"   ✅ Raw data has no IDs (as expected from GitHub)")
+        
+        # Verify keys are NOT normalized (raw data)
+        assert 'Categoria' in ingredientes[0], "Raw data should have 'Categoria' with capital C"
+        assert 'Opciones' in ingredientes[0], "Raw data should have 'Opciones' with capital O"
+        print(f"   ✅ Raw data has original keys (not normalized)")
+        
     except Exception as e:
         print(f"❌ Error: {e}")
         raise
@@ -125,9 +136,74 @@ def test_stable_id_generation():
     print(f"✅ Format is valid UUID (8-4-4-4-12)")
 
 
-def test_id_adapter():
-    """Test that IDAdapter adds stable IDs to data."""
-    print("\n🧪 Test 4: ID Adapter")
+def test_key_normalization():
+    """Test key normalization functions."""
+    print("\n🧪 Test 4: Key Normalization Functions")
+    print("=" * 50)
+    
+    # Test 4.1: normalize_key function
+    print("\n📋 Test 4.1: normalize_key() function")
+    print("-" * 50)
+    
+    test_cases = [
+        ('Categoria', 'categoria'),
+        ('Categoría', 'categoria'),
+        ('Tamaño', 'tamano'),
+        ('Año', 'ano'),
+        ('Opciones', 'opciones'),
+        ('España', 'espana'),
+        ('Niño', 'nino'),
+        ('NOMBRE', 'nombre'),
+        ('simple', 'simple'),  # Already normalized
+    ]
+    
+    for original, expected in test_cases:
+        result = normalize_key(original)
+        assert result == expected, f"Failed: {original} → {result} != {expected}"
+        print(f"   ✅ '{original}' → '{result}'")
+    
+    print("✅ All normalize_key tests passed")
+    
+    # Test 4.2: normalize_keys_recursive function
+    print("\n📋 Test 4.2: normalize_keys_recursive() function")
+    print("-" * 50)
+    
+    # Simple dict
+    data = {'Nombre': 'Juan', 'Año': 2024}
+    result = normalize_keys_recursive(data)
+    assert result == {'nombre': 'Juan', 'ano': 2024}
+    print(f"   ✅ Simple dict: {data} → {result}")
+    
+    # Nested dict
+    data = {
+        'Categoría': 'Pan',
+        'Opciones': [
+            {'Nombre': 'simple', 'Tamaño': 6},
+            {'Nombre': 'integral', 'Tamaño': 9}
+        ]
+    }
+    result = normalize_keys_recursive(data)
+    assert 'categoria' in result
+    assert 'opciones' in result
+    assert 'tamano' in result['opciones'][0]
+    print(f"   ✅ Nested structure normalized correctly")
+    
+    # List of dicts
+    data = [
+        {'Año': 2024, 'España': True},
+        {'Año': 2025, 'España': False}
+    ]
+    result = normalize_keys_recursive(data)
+    assert result[0] == {'ano': 2024, 'espana': True}
+    assert result[1] == {'ano': 2025, 'espana': False}
+    print(f"   ✅ List of dicts normalized correctly")
+    
+    print("✅ All normalize_keys_recursive tests passed")
+
+
+def test_key_normalization_adapter():
+    """Test KeyNormalizationAdapter standalone."""
+    print("\n🧪 Test 5: Key Normalization Adapter (Standalone)")
     print("=" * 50)
     
     # Setup GitHub client
@@ -137,8 +213,76 @@ def test_id_adapter():
         branch=config.GITHUB_BRANCH
     )
     
-    # Test 4.1: Adapter with grouped structure (ingredientes)
-    print("\n📋 Test 4.1: ID Adapter with GROUPED structure")
+    # Test 5.1: Adapter with ingredientes (GROUPED structure)
+    print("\n📋 Test 5.1: Normalize keys in GROUPED structure")
+    print("-" * 50)
+    try:
+        # Wrap GitHub with normalization adapter
+        normalized_source = KeyNormalizationAdapter(github)
+        ingredientes = normalized_source.fetch_data("ingredientes.json")
+        
+        print(f"✅ Fetched {len(ingredientes)} categories")
+        
+        # Verify keys are normalized
+        first_group = ingredientes[0]
+        assert 'categoria' in first_group, "Should have 'categoria' (normalized)"
+        assert 'Categoria' not in first_group, "Should NOT have 'Categoria' (original)"
+        assert 'opciones' in first_group, "Should have 'opciones' (normalized)"
+        assert 'Opciones' not in first_group, "Should NOT have 'Opciones' (original)"
+        
+        first_item = first_group['opciones'][0]
+        if 'tamaño' in first_item:
+            print(f"   ⚠️  Item still has 'tamaño' (source data already has accents removed)")
+        if 'tamano' in first_item:
+            print(f"   ✅ Item has 'tamano' (normalized)")
+        
+        print(f"   ✅ Keys normalized: {list(first_group.keys())}")
+        print(f"   ✅ Item keys: {list(first_item.keys())}")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        raise
+    
+    # Test 5.2: Adapter with menu (FLAT structure)
+    print("\n📋 Test 5.2: Normalize keys in FLAT structure")
+    print("-" * 50)
+    try:
+        normalized_source = KeyNormalizationAdapter(github)
+        menu = normalized_source.fetch_data("menu.json")
+        
+        print(f"✅ Fetched {len(menu)} hot dogs")
+        
+        # Verify keys are normalized
+        first_item = menu[0]
+        
+        # Check that all keys are lowercase
+        all_lowercase = all(key.islower() for key in first_item.keys())
+        assert all_lowercase, "All keys should be lowercase"
+        print(f"   ✅ All keys are lowercase: {list(first_item.keys())}")
+        
+        # Verify values are preserved (not modified)
+        assert first_item['nombre'] is not None, "Values should be preserved"
+        print(f"   ✅ Values preserved: nombre={first_item['nombre']}")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        raise
+
+
+def test_id_adapter():
+    """Test that IDAdapter adds stable IDs to data."""
+    print("\n🧪 Test 6: ID Adapter")
+    print("=" * 50)
+    
+    # Setup GitHub client
+    github = GitHubClient(
+        owner=config.GITHUB_OWNER,
+        repo=config.GITHUB_REPO,
+        branch=config.GITHUB_BRANCH
+    )
+    
+    # Test 6.1: Adapter with grouped structure (ingredientes)
+    print("\n📋 Test 6.1: ID Adapter with GROUPED structure")
     print("-" * 50)
     try:
         ingredientes_adapter = IDAdapter(github, process_grouped_structure_ids)
@@ -152,7 +296,8 @@ def test_id_adapter():
             categoria = group['Categoria']
             for item in group['Opciones']:
                 assert 'id' in item, f"Item {item['nombre']} in {categoria} should have ID"
-                print(f"   ✅ {categoria}:{item['nombre']} → {item['id']}")
+                if id_count < 3:  # Only print first 3
+                    print(f"   ✅ {categoria}:{item['nombre']} → {item['id']}")
                 id_count += 1
         
         print(f"✅ All {id_count} items have IDs")
@@ -161,8 +306,8 @@ def test_id_adapter():
         print(f"❌ Error: {e}")
         raise
     
-    # Test 4.2: Adapter with flat structure (menu)
-    print("\n📋 Test 4.2: ID Adapter with FLAT structure")
+    # Test 6.2: Adapter with flat structure (menu)
+    print("\n📋 Test 6.2: ID Adapter with FLAT structure")
     print("-" * 50)
     try:
         menu_adapter = IDAdapter(github, process_flat_structure_ids)
@@ -171,9 +316,10 @@ def test_id_adapter():
         print(f"✅ Fetched {len(menu)} hot dogs")
         
         # Verify all items have IDs
-        for item in menu:
+        for i, item in enumerate(menu):
             assert 'id' in item, f"Hot dog {item['nombre']} should have ID"
-            print(f"   ✅ {item['nombre']} → {item['id']}")
+            if i < 3:  # Only print first 3
+                print(f"   ✅ {item['nombre']} → {item['id']}")
         
         print(f"✅ All {len(menu)} hot dogs have IDs")
         
@@ -181,8 +327,8 @@ def test_id_adapter():
         print(f"❌ Error: {e}")
         raise
     
-    # Test 4.3: IDs are stable across multiple fetches
-    print("\n📋 Test 4.3: ID stability across fetches")
+    # Test 6.3: IDs are stable across multiple fetches
+    print("\n📋 Test 6.3: ID stability across fetches")
     print("-" * 50)
     try:
         adapter = IDAdapter(github, process_grouped_structure_ids)
@@ -203,9 +349,9 @@ def test_id_adapter():
         raise
 
 
-def test_data_source_client_with_ids():
-    """Test the full DataSourceClient with ID adapters."""
-    print("\n🧪 Test 5: DataSourceClient Integration (with IDs)")
+def test_chained_adapters():
+    """Test chaining ID and KeyNormalization adapters."""
+    print("\n🧪 Test 7: Chained Adapters (ID + KeyNormalization)")
     print("=" * 50)
     
     # Setup GitHub client
@@ -215,14 +361,133 @@ def test_data_source_client_with_ids():
         branch=config.GITHUB_BRANCH
     )
     
-    # Wrap with ID adapters
-    ingredientes_source = IDAdapter(github, process_grouped_structure_ids)
-    menu_source = IDAdapter(github, process_flat_structure_ids)
+    # Test 7.1: Chain with ingredientes (GROUPED)
+    print("\n📋 Test 7.1: ID → KeyNormalization chain (GROUPED)")
+    print("-" * 50)
+    try:
+        # Chain: GitHub → ID → KeyNormalization
+        with_ids = IDAdapter(github, process_grouped_structure_ids)
+        fully_processed = KeyNormalizationAdapter(with_ids)
+        
+        ingredientes = fully_processed.fetch_data("ingredientes.json")
+        
+        print(f"✅ Fetched {len(ingredientes)} categories")
+        
+        # Verify both IDs and normalized keys
+        first_group = ingredientes[0]
+        assert 'categoria' in first_group, "Should have normalized key 'categoria'"
+        assert 'opciones' in first_group, "Should have normalized key 'opciones'"
+        
+        first_item = first_group['opciones'][0]
+        assert 'id' in first_item, "Should have ID from IDAdapter"
+        assert 'nombre' in first_item, "Should have 'nombre' key"
+        
+        print(f"   ✅ Group keys normalized: {list(first_group.keys())}")
+        print(f"   ✅ Item has ID: {first_item['id']}")
+        print(f"   ✅ Item keys normalized: {list(first_item.keys())}")
+        
+        # Verify ID format is still valid
+        id_parts = first_item['id'].split('-')
+        assert len(id_parts) == 5, "ID should still be valid UUID format"
+        print(f"   ✅ ID format preserved: {first_item['id']}")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        raise
+    
+    # Test 7.2: Chain with menu (FLAT)
+    print("\n📋 Test 7.2: ID → KeyNormalization chain (FLAT)")
+    print("-" * 50)
+    try:
+        with_ids = IDAdapter(github, process_flat_structure_ids)
+        fully_processed = KeyNormalizationAdapter(with_ids)
+        
+        menu = fully_processed.fetch_data("menu.json")
+        
+        print(f"✅ Fetched {len(menu)} hot dogs")
+        
+        first_item = menu[0]
+        assert 'id' in first_item, "Should have ID"
+        assert 'nombre' in first_item, "Should have 'nombre'"
+        
+        # All keys should be lowercase
+        all_lowercase = all(key.islower() for key in first_item.keys())
+        assert all_lowercase, "All keys should be lowercase"
+        
+        print(f"   ✅ Item has ID: {first_item['id']}")
+        print(f"   ✅ All keys lowercase: {list(first_item.keys())}")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        raise
+    
+    # Test 7.3: Verify order doesn't matter for these adapters
+    print("\n📋 Test 7.3: Adapter order independence")
+    print("-" * 50)
+    try:
+        # Order 1: ID → KeyNormalization
+        chain1 = KeyNormalizationAdapter(
+            IDAdapter(github, process_flat_structure_ids)
+        )
+        result1 = chain1.fetch_data("menu.json")
+        
+        # Order 2: KeyNormalization → ID (ID processor should still work on normalized keys)
+        chain2 = IDAdapter(
+            KeyNormalizationAdapter(github),
+            process_flat_structure_ids
+        )
+        result2 = chain2.fetch_data("menu.json")
+        
+        # Both should have IDs and normalized keys
+        assert 'id' in result1[0], "Order 1 should have ID"
+        assert 'id' in result2[0], "Order 2 should have ID"
+        assert 'nombre' in result1[0], "Order 1 should have normalized keys"
+        assert 'nombre' in result2[0], "Order 2 should have normalized keys"
+        
+        # IDs should be the same (deterministic)
+        assert result1[0]['id'] == result2[0]['id'], "Same item should have same ID regardless of adapter order"
+        
+        print(f"   ✅ Order 1 ID: {result1[0]['id']}")
+        print(f"   ✅ Order 2 ID: {result2[0]['id']}")
+        print(f"   ✅ Adapters are order-independent for these operations")
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        raise
+
+
+def test_data_source_client_with_all_adapters():
+    """Test the full DataSourceClient with chained adapters."""
+    print("\n🧪 Test 8: DataSourceClient Integration (Full Chain)")
+    print("=" * 50)
+    
+    # Setup GitHub client
+    github = GitHubClient(
+        owner=config.GITHUB_OWNER,
+        repo=config.GITHUB_REPO,
+        branch=config.GITHUB_BRANCH
+    )
+    
+    # Create fully processed sources with chained adapters
+    print("\n📋 Setting up adapter chains...")
+    print("-" * 50)
+    
+    # Ingredientes: GitHub → ID → KeyNormalization
+    ingredientes_source = KeyNormalizationAdapter(
+        IDAdapter(github, process_grouped_structure_ids)
+    )
+    print("✅ Ingredientes: GitHub → IDAdapter → KeyNormalizationAdapter")
+    
+    # Menu: GitHub → ID → KeyNormalization
+    menu_source = KeyNormalizationAdapter(
+        IDAdapter(github, process_flat_structure_ids)
+    )
+    print("✅ Menu: GitHub → IDAdapter → KeyNormalizationAdapter")
     
     data_source = DataSourceClient(data_dir=config.DATA_DIR)
     
-    # Test 5.1: Initialize with force_external=True
-    print("\n📋 Test 5.1: Force external fetch (with ID adapters)")
+    # Test 8.1: Initialize with force_external=True
+    print("\n📋 Test 8.1: Force external fetch (with full adapter chain)")
     print("-" * 50)
     try:
         data_source.initialize(
@@ -232,42 +497,55 @@ def test_data_source_client_with_ids():
             },
             force_external=True
         )
-        print("✅ Initialization with ID adapters succeeded")
+        print("✅ Initialization with full adapter chain succeeded")
     except Exception as e:
         print(f"❌ Error during initialization: {e}")
         raise
     
-    # Test 5.2: Verify data has IDs
-    print("\n📋 Test 5.2: Verify all data has IDs")
+    # Test 8.2: Verify data has IDs and normalized keys
+    print("\n📋 Test 8.2: Verify data has IDs AND normalized keys")
     print("-" * 50)
     try:
         ingredientes = data_source.get('ingredientes')
         menu = data_source.get('menu')
         
-        # Check ingredientes
-        for group in ingredientes:
-            for item in group['Opciones']:
-                assert 'id' in item, f"Item {item['nombre']} should have ID"
-        print(f"✅ All ingredientes have IDs ({len(ingredientes)} categories)")
+        # Check ingredientes structure
+        first_group = ingredientes[0]
+        assert 'categoria' in first_group, "Should have normalized 'categoria'"
+        assert 'opciones' in first_group, "Should have normalized 'opciones'"
+        assert 'Categoria' not in first_group, "Should NOT have original 'Categoria'"
         
-        # Check menu
-        for item in menu:
-            assert 'id' in item, f"Hot dog {item['nombre']} should have ID"
-        print(f"✅ All menu items have IDs ({len(menu)} hot dogs)")
+        first_item = first_group['opciones'][0]
+        assert 'id' in first_item, "Should have ID"
+        assert 'nombre' in first_item, "Should have 'nombre'"
+        
+        print(f"✅ Ingredientes: {len(ingredientes)} categories")
+        print(f"   ✅ Keys normalized: {list(first_group.keys())}")
+        print(f"   ✅ Items have IDs: {first_item['id']}")
+        
+        # Check menu structure
+        first_hotdog = menu[0]
+        assert 'id' in first_hotdog, "Should have ID"
+        all_lowercase = all(key.islower() for key in first_hotdog.keys())
+        assert all_lowercase, "All keys should be lowercase"
+        
+        print(f"✅ Menu: {len(menu)} hot dogs")
+        print(f"   ✅ All keys lowercase: {list(first_hotdog.keys())}")
+        print(f"   ✅ Has ID: {first_hotdog['id']}")
         
     except Exception as e:
-        print(f"❌ Error verifying IDs: {e}")
+        print(f"❌ Error verifying data: {e}")
         raise
     
-    # Test 5.3: Save and reload - IDs should persist
-    print("\n📋 Test 5.3: Save and reload - verify ID persistence")
+    # Test 8.3: Save and reload - both IDs and normalized keys should persist
+    print("\n📋 Test 8.3: Save and reload - verify persistence")
     print("-" * 50)
     try:
-        # Get first item's ID
-        original_id = ingredientes[0]['Opciones'][0]['id']
-        original_name = ingredientes[0]['Opciones'][0]['nombre']
+        # Get first item info
+        original_id = ingredientes[0]['opciones'][0]['id']
+        original_name = ingredientes[0]['opciones'][0]['nombre']
         
-        # Save (IDs should be saved to local file)
+        # Save (both IDs and normalized keys should be saved)
         data_source.save('ingredientes', ingredientes)
         print(f"✅ Saved ingredientes to local file")
         
@@ -281,21 +559,27 @@ def test_data_source_client_with_ids():
             force_external=False  # Should load from local
         )
         
-        # Verify ID persisted
+        # Verify both ID and keys persisted
         ingredientes_reloaded = data_source_2.get('ingredientes')
-        reloaded_id = ingredientes_reloaded[0]['Opciones'][0]['id']
+        reloaded_group = ingredientes_reloaded[0]
+        reloaded_item = reloaded_group['opciones'][0]
+        reloaded_id = reloaded_item['id']
         
-        assert reloaded_id == original_id, "IDs should persist across save/load"
-        print(f"✅ Original:  {original_name} → {original_id}")
-        print(f"✅ Reloaded:  {original_name} → {reloaded_id}")
-        print(f"✅ IDs persisted correctly")
+        assert reloaded_id == original_id, "IDs should persist"
+        assert 'categoria' in reloaded_group, "Normalized keys should persist"
+        assert 'opciones' in reloaded_group, "Normalized keys should persist"
+        
+        print(f"✅ Original ID:  {original_id}")
+        print(f"✅ Reloaded ID:  {reloaded_id}")
+        print(f"✅ Keys still normalized: {list(reloaded_group.keys())}")
+        print(f"✅ Both IDs and normalized keys persisted correctly")
         
     except Exception as e:
         print(f"❌ Error testing persistence: {e}")
         raise
     
-    # Test 5.4: Force reload from GitHub - IDs should remain stable
-    print("\n📋 Test 5.4: Force reload from GitHub - verify ID stability")
+    # Test 8.4: Force reload from GitHub - everything should remain consistent
+    print("\n📋 Test 8.4: Force reload from GitHub - verify consistency")
     print("-" * 50)
     try:
         # Force reload from GitHub
@@ -308,30 +592,37 @@ def test_data_source_client_with_ids():
             force_external=True  # Force download from GitHub
         )
         
-        # Verify same ID for same item
+        # Verify same ID and normalized keys
         ingredientes_fresh = data_source_3.get('ingredientes')
-        fresh_id = ingredientes_fresh[0]['Opciones'][0]['id']
+        fresh_group = ingredientes_fresh[0]
+        fresh_item = fresh_group['opciones'][0]
+        fresh_id = fresh_item['id']
         
-        assert fresh_id == original_id, "Same item should have same ID even after reload from GitHub"
+        assert fresh_id == original_id, "IDs should be stable even after GitHub reload"
+        assert 'categoria' in fresh_group, "Keys should be normalized after reload"
+        assert 'opciones' in fresh_group, "Keys should be normalized after reload"
+        
         print(f"✅ Original ID:     {original_id}")
         print(f"✅ After reload ID: {fresh_id}")
-        print(f"✅ IDs are stable across GitHub reloads (deterministic generation)")
+        print(f"✅ Keys normalized: {list(fresh_group.keys())}")
+        print(f"✅ Full consistency maintained across GitHub reloads")
         
     except Exception as e:
         print(f"❌ Error testing GitHub reload: {e}")
         raise
     
     print("\n" + "=" * 50)
-    print("🎉 All DataSourceClient + ID tests passed!\n")
+    print("🎉 All DataSourceClient + Full Adapter Chain tests passed!")
+    print("=" * 50 + "\n")
 
 
 def run_all_tests():
     """Run all tests in sequence."""
-    print("\n" + "=" * 50)
-    print("🚀 Starting Phase 1 Tests (with ID System)")
+    print("\n" + "=" * 60)
+    print("🚀 Starting Phase 1 Tests (Complete System)")
     print(f"📁 Using GitHub: {config.GITHUB_OWNER}/{config.GITHUB_REPO}")
     print(f"📂 Data directory: {config.DATA_DIR}")
-    print("=" * 50 + "\n")
+    print("=" * 60 + "\n")
     
     try:
         test_external_source_interface()
@@ -340,18 +631,34 @@ def run_all_tests():
         print()
         test_stable_id_generation()
         print()
+        test_key_normalization()
+        print()
+        test_key_normalization_adapter()
+        print()
         test_id_adapter()
         print()
-        test_data_source_client_with_ids()
+        test_chained_adapters()
+        print()
+        test_data_source_client_with_all_adapters()
         
-        print("=" * 50)
+        print("=" * 60)
         print("✅ ALL TESTS PASSED!")
-        print("=" * 50 + "\n")
+        print("=" * 60)
+        print("\n📊 Test Summary:")
+        print("   ✅ External Source Interface")
+        print("   ✅ GitHub Client (Raw Data)")
+        print("   ✅ Stable ID Generation")
+        print("   ✅ Key Normalization Functions")
+        print("   ✅ Key Normalization Adapter")
+        print("   ✅ ID Adapter")
+        print("   ✅ Chained Adapters")
+        print("   ✅ DataSourceClient Integration (Full)")
+        print("\n🎉 System ready for Fase 2 development!\n")
         
     except Exception as e:
-        print("\n" + "=" * 50)
+        print("\n" + "=" * 60)
         print(f"❌ TESTS FAILED: {e}")
-        print("=" * 50 + "\n")
+        print("=" * 60 + "\n")
         raise
 
 

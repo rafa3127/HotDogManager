@@ -605,4 +605,296 @@ El módulo `models/core/` completo puede extraerse y usarse en:
 
 ---
 
-**Última actualización**: NOV 13, 2025 - Rafael Correa
+
+---
+
+## Sistema de IDs con Adapter Pattern
+
+### Visión General
+
+**Decisión:** Implementamos un sistema de IDs estables que garantiza que toda la data tenga identificadores únicos y consistentes, independientemente de la fuente externa (GitHub, MongoDB, etc.).
+
+**Problema que resuelve:**
+- Las fuentes externas (GitHub) no tienen IDs
+- Necesitamos IDs únicos para referencias entre entidades
+- Los IDs deben ser estables entre reloads (mismo item = mismo ID)
+- Referencias no deben romperse al hacer reset desde GitHub
+
+---
+
+### Decisiones Arquitectónicas Detalladas
+
+#### 1. IDs Determinísticos con Hash
+
+**Decisión:** Usar hash MD5 de `category:nombre` para generar IDs estables en lugar de UUIDs aleatorios.
+
+**Implementación:**
+```python
+def generate_stable_id(natural_key: str, category: str = "") -> str:
+    seed = f"{category}:{natural_key}"
+    hash_digest = hashlib.md5(seed.encode('utf-8')).hexdigest()
+    return f"{hash_digest[:8]}-{hash_digest[8:12]}-..."  # Formato UUID
+```
+
+**Ventajas:**
+- Mismo input → siempre mismo output (determinístico)
+- Pan "simple" siempre tiene el mismo ID, incluso después de reset
+- Referencias entre entidades nunca se rompen
+- No necesitamos registry persistente
+
+**Alternativas rechazadas:**
+- UUID aleatorio: IDs cambiarían en cada reload → referencias rotas
+- Registry persistente: Complejidad innecesaria para este caso
+- IDs secuenciales: No funcionan con múltiples fuentes
+
+**Fecha:** NOV 14, 2025
+
+---
+
+#### 2. Adapter Pattern para Agregar IDs
+
+**Decisión:** Usar Adapter Pattern en lugar de que GitHubClient o DataSourceClient manejen IDs directamente.
+
+**Arquitectura:**
+```
+GitHub (sin IDs)
+  ↓
+GitHubClient (transporte puro, sin lógica de dominio)
+  ↓
+IDAdapter (wrapper que agrega IDs)
+  ↓
+DataSourceClient (recibe data con IDs garantizados)
+```
+
+**Implementación:**
+```python
+# GitHubClient permanece simple
+github = GitHubClient(owner, repo, branch)
+
+# IDAdapter envuelve y agrega funcionalidad
+ingredientes_source = IDAdapter(
+    external_source=github,
+    id_processor=process_grouped_structure_ids
+)
+
+# DataSource recibe source que SIEMPRE tiene IDs
+data_source.initialize({'ingredientes': ingredientes_source})
+```
+
+**Por qué NO en GitHubClient:**
+- GitHubClient quedaría acoplado a estructura de dominio
+- Violaría Single Responsibility Principle
+- No sería reutilizable para otros proyectos
+- Tendría que conocer estructura GROUPED vs FLAT
+
+**Por qué NO en DataSourceClient:**
+- DataSource debe ser agnóstico del dominio
+- Extensibilidad: cada nueva collection requeriría modificar DataSource
+- Testing más difícil
+
+**Ventajas del Adapter:**
+- Composition over inheritance
+- GitHubClient reutilizable y simple
+- Mismo github client para diferentes estructuras
+- Fácil agregar nuevas fuentes (MongoDB, APIs, etc.)
+- Testeable con mocks simples
+
+**Fecha:** NOV 14, 2025
+
+---
+
+#### 3. ID Processors por Estructura de Datos
+
+**Decisión:** Crear processors específicos para cada tipo de estructura (GROUPED, FLAT) en lugar de un processor universal.
+
+**Implementación:**
+- `process_grouped_structure_ids()`: Para ingredientes con estructura `[{Categoria, Opciones: [...]}]`
+- `process_flat_structure_ids()`: Para menu con estructura `[{item}, {item}, ...]`
+
+**Por qué NO un processor universal:**
+- Solo 2-3 estructuras diferentes en el proyecto
+- Cada una tiene lógica única de traversal
+- Over-engineering crear abstracción para pocos casos
+- Simplicidad > generalización excesiva
+
+**Signatura de processors:**
+```python
+def process_X_structure_ids(
+    raw_data: Any,
+    **config
+) -> Tuple[Any, bool]:
+    """
+    Returns:
+        (processed_data, modified): modified=True si se agregaron IDs
+    """
+```
+
+**Fecha:** NOV 14, 2025
+
+---
+
+#### 4. Contrato de External Sources
+
+**Decisión:** Documentar que External Sources DEBEN devolver data con IDs, pero no forzarlos a implementarlo ellos mismos.
+
+**Contrato:**
+> "Todo ExternalSourceClient que se pase a DataSourceClient DEBE devolver data con IDs"
+
+**Implementación del contrato:**
+- Sources crudos (GitHubClient): NO tienen IDs → se wrappean con IDAdapter
+- Sources nativos con IDs: Pasan directo sin adapter
+- DataSourceClient asume que SIEMPRE recibe data con IDs
+
+**Ventajas:**
+- Contrato claro y explícito
+- Flexibilidad: sources con IDs nativos skip el adapter
+- Separación de responsabilidades clara
+
+**Fecha:** NOV 14, 2025
+
+---
+
+#### 5. Unicidad de Nombres por Categoría
+
+**Decisión:** Prohibir nombres duplicados dentro de la misma categoría.
+
+**Razón:**
+- IDs estables se basan en `category:nombre`
+- Dos items con mismo nombre en misma categoría → colisión de IDs
+- No tiene sentido de negocio (¿para qué dos panes "simple"?)
+
+**Validación:**
+- Se implementará en Collection.add() (Fase 1 pendiente)
+- Error: "Ya existe un Pan llamado 'simple'"
+
+**Nombres duplicados entre categorías SÍ permitidos:**
+- Pan "simple" → ID basado en "Pan:simple"
+- Salsa "simple" → ID basado en "Salsa:simple"
+- Diferentes IDs → sin colisión ✅
+
+**Fecha:** NOV 14, 2025
+
+---
+
+#### 6. Persistencia de IDs en Archivos Locales
+
+**Decisión:** Los IDs se persisten en los archivos JSON locales, no solo en memoria.
+
+**Flujo:**
+1. **Primera carga** (desde GitHub sin IDs):
+   ```
+   GitHub → GitHubClient → IDAdapter (agrega IDs) → DataSource
+                                                    ↓
+                                            data/ingredientes.json (CON IDs)
+   ```
+
+2. **Cargas posteriores** (desde local):
+   ```
+   data/ingredientes.json (CON IDs) → DataSource
+   ```
+
+3. **Reset/Reload** (force_external=True):
+   ```
+   GitHub → IDAdapter (regenera MISMOS IDs) → data/ingredientes.json
+   ```
+
+**Ventajas:**
+- No hay que regenerar IDs en cada startup
+- Archivos locales son source of truth con IDs
+- IDs persisten entre sesiones
+- Performance: solo se generan una vez
+
+**Fecha:** NOV 14, 2025
+
+---
+
+### Estructura Final del Sistema
+
+**Módulos creados:**
+```
+clients/
+├── id_processors.py              # Funciones de generación de IDs
+├── adapters/
+│   ├── __init__.py
+│   └── id_adapter.py            # IDAdapter class
+└── external_sources/
+    ├── external_source_client.py  # Contrato actualizado
+    └── github_client.py          # Sin cambios (permanece simple)
+```
+
+**Flujo de datos completo:**
+```
+1. Configuración
+   github_client = GitHubClient(...)
+   adapted = IDAdapter(github_client, process_grouped_structure_ids)
+   
+2. Inicialización
+   data_source.initialize({'ingredientes': adapted})
+   
+3. Interno del adapter
+   raw_data = github_client.fetch_data('ingredientes.json')  # Sin IDs
+   processed_data, modified = processor(raw_data)             # Con IDs
+   return processed_data
+   
+4. DataSource persiste
+   data_source._save_local('ingredientes', processed_data)   # Guarda con IDs
+```
+
+---
+
+### Testing
+
+**Tests implementados:**
+1. `test_stable_id_generation()`: Verifica determinismo y formato UUID
+2. `test_id_adapter()`: Prueba adapters con GROUPED y FLAT
+3. `test_data_source_client_with_ids()`: Integración completa end-to-end
+
+**Cobertura:**
+- ✅ Generación determinística de IDs
+- ✅ Formato UUID válido
+- ✅ Adapter con múltiples estructuras
+- ✅ Persistencia de IDs en archivos locales
+- ✅ Estabilidad de IDs entre reloads
+- ✅ Integración con DataSourceClient
+
+---
+
+### Ventajas del Sistema
+
+**Para el proyecto:**
+- IDs únicos y consistentes garantizados
+- Referencias entre entidades estables
+- No se rompen al hacer reset desde GitHub
+- Sistema extensible a nuevas fuentes de datos
+
+**Para arquitectura:**
+- Separation of concerns clara
+- GitHubClient reutilizable sin conocimiento del dominio
+- DataSourceClient agnóstico de estructura
+- Adapter Pattern bien aplicado
+- Fácil agregar nuevas fuentes (MongoDB, APIs, etc.)
+
+**Para testing:**
+- Mocks simples sin preocuparse por IDs
+- Tests unitarios de cada componente
+- Tests de integración end-to-end
+
+---
+
+### Trade-offs
+
+**Ventajas vs alternativas:**
+- ✅ Más simple que registry persistente
+- ✅ Más flexible que IDs en GitHubClient
+- ✅ Más robusto que UUIDs aleatorios
+
+**Limitaciones:**
+- ⚠️ MD5 no es criptográficamente seguro (pero suficiente para IDs)
+- ⚠️ Cambiar nombre de item cambia su ID (pero esto es esperado)
+- ⚠️ Colisiones posibles en teoría (pero extremadamente improbables)
+
+---
+
+**Última actualización**: NOV 14, 2025 - Rafael Correa
+
+

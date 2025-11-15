@@ -24,22 +24,52 @@ def test_ingredient_entities_with_fallback():
     print("="*60)
     
     # Create entities without raw data (uses fallback)
-    Ingredient, Pan, Salchicha, Topping, Salsa, Acompañante = create_ingredient_entities()
+    # NOW RETURNS A DICT!
+    entities = create_ingredient_entities()
     
-    print("✅ Successfully created classes:")
+    # DEBUG: Ver qué claves están disponibles
+    print("\n🔍 DEBUG - Available entity types:")
+    for entity_type in entities.keys():
+        print(f"  - '{entity_type}'")
+    
+    # Extract classes from dict
+    Ingredient = entities['Ingredient']
+    Pan = entities['Pan']
+    Salchicha = entities['Salchicha']
+    Toppings = entities['Toppings']  # Note: Capitalized!
+    Salsa = entities['Salsa']
+    
+    # DEBUG: Intentar diferentes variaciones para Acompañante
+    print("\n🔍 DEBUG - Trying to find Acompañante:")
+    possible_keys = ['Acompanante', 'Acompañante', 'acompanante', 'acompañante']
+    acompanante_key = None
+    for key in possible_keys:
+        if key in entities:
+            print(f"  ✅ Found as '{key}'")
+            acompanante_key = key
+            break
+        else:
+            print(f"  ❌ Not found as '{key}'")
+    
+    if acompanante_key is None:
+        raise KeyError(f"Could not find Acompañante variant. Available keys: {list(entities.keys())}")
+    
+    Acompanante = entities[acompanante_key]
+    
+    print("\n✅ Successfully created classes:")
     print(f"  - Ingredient: {Ingredient}")
     print(f"  - Pan: {Pan}")
     print(f"  - Salchicha: {Salchicha}")
-    print(f"  - Topping: {Topping}")
+    print(f"  - Toppings: {Toppings}")
     print(f"  - Salsa: {Salsa}")
-    print(f"  - Acompañante: {Acompañante}")
+    print(f"  - Acompanante (key='{acompanante_key}'): {Acompanante}")
     
     # Test inheritance
     print("\n📋 Testing inheritance:")
     print(f"  - Pan inherits from Ingredient: {issubclass(Pan, Ingredient)}")
     print(f"  - Salchicha inherits from Ingredient: {issubclass(Salchicha, Ingredient)}")
     
-    return Ingredient, Pan, Salchicha, Topping, Salsa, Acompañante
+    return Ingredient, Pan, Salchicha, Toppings, Salsa, Acompanante
 
 
 def test_pan_instantiation(Pan):
@@ -49,12 +79,13 @@ def test_pan_instantiation(Pan):
     print("="*60)
     
     # Create a Pan instance
+    # Note: Schema keys are normalized (no accents)
     pan = Pan(
         id='pan-001',
         entity_type='Pan',
         nombre='baguette',
         tipo='francés',
-        tamaño=10,
+        tamano=10,  # normalized: tamaño -> tamano
         unidad='pulgadas'
     )
     
@@ -64,7 +95,7 @@ def test_pan_instantiation(Pan):
     print(f"\n📋 Attributes:")
     print(f"  - nombre: {pan.nombre}")
     print(f"  - tipo: {pan.tipo}")
-    print(f"  - tamaño: {pan.tamaño}")
+    print(f"  - tamano: {pan.tamano}")  # normalized
     print(f"  - unidad: {pan.unidad}")
     
     # Test to_dict
@@ -86,7 +117,7 @@ def test_pan_validation(Pan):
         entity_type='Pan',
         nombre='integral',
         tipo='trigo',
-        tamaño=8,
+        tamano=8,  # normalized
         unidad='pulgadas'
     )
     
@@ -104,7 +135,7 @@ def test_pan_validation(Pan):
             entity_type='Pan',
             nombre='',  # Empty nombre
             tipo='blanco',
-            tamaño=6,
+            tamano=6,  # normalized
             unidad='pulgadas'
         )
         invalid_pan.validate()
@@ -112,15 +143,15 @@ def test_pan_validation(Pan):
     except ValueError as e:
         print(f"  ✅ Validation failed as expected: {e}")
     
-    # Invalid pan - negative tamaño (specific validation should catch)
-    print("\n📋 Testing Pan with negative tamaño (should fail specific validation):")
+    # Invalid pan - negative tamano (specific validation should catch)
+    print("\n📋 Testing Pan with negative tamano (should fail specific validation):")
     try:
         invalid_pan2 = Pan(
             id='pan-004',
             entity_type='Pan',
             nombre='test',
             tipo='blanco',
-            tamaño=-5,  # Negative
+            tamano=-5,  # Negative, normalized
             unidad='pulgadas'
         )
         invalid_pan2.validate()
@@ -141,7 +172,7 @@ def test_salchicha_matches_size(Salchicha, Pan):
         entity_type='Salchicha',
         nombre='chorizo',
         tipo='español',
-        tamaño=10,
+        tamano=10,  # normalized
         unidad='pulgadas'
     )
     
@@ -150,7 +181,7 @@ def test_salchicha_matches_size(Salchicha, Pan):
         entity_type='Pan',
         nombre='largo',
         tipo='blanco',
-        tamaño=10,
+        tamano=10,  # normalized
         unidad='pulgadas'
     )
     
@@ -159,13 +190,13 @@ def test_salchicha_matches_size(Salchicha, Pan):
         entity_type='Pan',
         nombre='corto',
         tipo='blanco',
-        tamaño=6,
+        tamano=6,  # normalized
         unidad='pulgadas'
     )
     
-    print(f"✅ Created Salchicha (tamaño=10): {salchicha.nombre}")
-    print(f"✅ Created Pan matching (tamaño=10): {pan_matching.nombre}")
-    print(f"✅ Created Pan different (tamaño=6): {pan_different.nombre}")
+    print(f"✅ Created Salchicha (tamano=10): {salchicha.nombre}")
+    print(f"✅ Created Pan matching (tamano=10): {pan_matching.nombre}")
+    print(f"✅ Created Pan different (tamano=6): {pan_different.nombre}")
     
     # Test matches_size
     print(f"\n🔧 Testing matches_size method:")
@@ -181,44 +212,51 @@ def test_salchicha_matches_size(Salchicha, Pan):
         print(f"  ❌ Validation failed: {e}")
 
 
-def test_simple_ingredients(Topping, Salsa, Acompañante):
-    """Test simpler ingredient types (Topping, Salsa, Acompañante)."""
+def test_simple_ingredients(Toppings, Salsa, Acompanante):
+    """Test simpler ingredient types (Toppings, Salsa, Acompanante)."""
     print("\n" + "="*60)
-    print("TEST 5: Simple ingredients (Topping, Salsa, Acompañante)")
+    print("TEST 5: Simple ingredients (Toppings, Salsa, Acompanante)")
     print("="*60)
     
-    # Topping
-    topping = Topping(
+    # Toppings (capitalized and plural!)
+    # Note: Toppings has 'tipo' and 'presentacion' properties
+    topping = Toppings(
         id='topping-001',
-        entity_type='Topping',
+        entity_type='Toppings',
         nombre='cebolla',
-        tipo='vegetales'
+        tipo='vegetales',
+        presentacion='picada'  # Required property!
     )
-    print(f"✅ Created Topping: {topping}")
+    print(f"✅ Created Toppings: {topping}")
     topping.validate()
-    print("  ✅ Topping validation passed")
+    print("  ✅ Toppings validation passed")
     
     # Salsa
+    # Note: Salsa has 'base' and 'color' properties (from fallback)
     salsa = Salsa(
         id='salsa-001',
         entity_type='Salsa',
         nombre='ketchup',
-        tipo='tomate'
+        base='tomate',
+        color='rojo'
     )
     print(f"\n✅ Created Salsa: {salsa}")
     salsa.validate()
     print("  ✅ Salsa validation passed")
     
-    # Acompañante
-    acompañante = Acompañante(
+    # Acompanante (normalized: no ñ in class name)
+    # Note: Acompanante has 'tipo', 'tamano', 'unidad' properties (from fallback)
+    acompanante = Acompanante(
         id='acomp-001',
-        entity_type='Acompañante',
+        entity_type='Acompanante',  # Note: normalized, no ñ
         nombre='Papas',
-        tipo='fritas'
+        tipo='fritas',
+        tamano=100,  # normalized
+        unidad='gramos'
     )
-    print(f"\n✅ Created Acompañante: {acompañante}")
-    acompañante.validate()
-    print("  ✅ Acompañante validation passed")
+    print(f"\n✅ Created Acompanante: {acompanante}")
+    acompanante.validate()
+    print("  ✅ Acompanante validation passed")
 
 
 def test_hotdog_entities():
@@ -228,19 +266,22 @@ def test_hotdog_entities():
     print("="*60)
     
     # Create HotDog class with fallback
-    HotDog = create_hotdog_entities()
+    # NOW RETURNS A DICT!
+    entities = create_hotdog_entities()
+    HotDog = entities['HotDog']
     print(f"✅ Created HotDog class: {HotDog}")
     
     # Create instance
+    # Note: Keys are normalized (no accents, lowercase)
     hotdog = HotDog(
         id='hotdog-001',
         entity_type='HotDog',
         nombre='simple',
-        Pan='simple',
-        Salchicha='weiner',
+        pan='simple',  # normalized: Pan -> pan
+        salchicha='weiner',  # normalized: Salchicha -> salchicha
         toppings=[],
         salsas=[],
-        Acompañante=None
+        acompanante=None  # normalized: Acompañante -> acompanante
     )
     
     print(f"\n✅ Created HotDog instance: {hotdog}")
@@ -256,11 +297,11 @@ def test_hotdog_entities():
         id='hotdog-002',
         entity_type='HotDog',
         nombre='especial',
-        Pan='integral',
-        Salchicha='chorizo',
+        pan='integral',  # normalized
+        salchicha='chorizo',  # normalized
         toppings=['cebolla', 'tomate'],
         salsas=['ketchup', 'mostaza'],
-        Acompañante='Papas'
+        acompanante='Papas'  # normalized
     )
     
     print(f"\n✅ Created HotDog combo: {hotdog_combo}")
@@ -283,11 +324,11 @@ def test_hotdog_entities():
             id='hotdog-003',
             entity_type='HotDog',
             nombre='',
-            Pan='simple',
-            Salchicha='weiner',
+            pan='simple',  # normalized
+            salchicha='weiner',  # normalized
             toppings=[],
             salsas=[],
-            Acompañante=None
+            acompanante=None  # normalized
         )
         invalid_hotdog.validate()
         print("  ❌ Validation should have failed!")
@@ -303,11 +344,11 @@ def run_all_tests():
     
     try:
         # Test ingredients
-        Ingredient, Pan, Salchicha, Topping, Salsa, Acompañante = test_ingredient_entities_with_fallback()
+        Ingredient, Pan, Salchicha, Toppings, Salsa, Acompanante = test_ingredient_entities_with_fallback()
         test_pan_instantiation(Pan)
         test_pan_validation(Pan)
         test_salchicha_matches_size(Salchicha, Pan)
-        test_simple_ingredients(Topping, Salsa, Acompañante)
+        test_simple_ingredients(Toppings, Salsa, Acompanante)
         
         # Test hotdogs
         test_hotdog_entities()

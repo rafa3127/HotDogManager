@@ -1,5 +1,5 @@
-"""
-Plugin for Topping ingredient entities.
+"""  
+Plugin for Toppings ingredient entities.
 
 Registers validators for topping ingredients.
 
@@ -10,7 +10,7 @@ Date: November 13, 2025
 from models.core.method_registry import MethodRegistry
 
 
-def validate_topping_tipo(self) -> bool:
+def validate_toppings_tipo(self) -> bool:
     """
     Validate tipo property.
     
@@ -21,12 +21,33 @@ def validate_topping_tipo(self) -> bool:
         ValueError: If tipo is invalid
     """
     if not hasattr(self, 'tipo'):
-        raise ValueError(f"Topping '{self.nombre}' must have 'tipo' property")
+        raise ValueError(f"Toppings '{self.nombre}' must have 'tipo' property")
     
     if not self.tipo or str(self.tipo).strip() == '':
-        raise ValueError(f"Topping '{self.nombre}' must have non-empty 'tipo'")
+        raise ValueError(f"Toppings '{self.nombre}' must have non-empty 'tipo'")
     
     return True
 
 
-MethodRegistry.register_validator('Topping', validate_topping_tipo)
+def validate_toppings_presentacion(self) -> bool:
+    """
+    Validate presentacion property.
+    
+    Returns:
+        True if valid
+    
+    Raises:
+        ValueError: If presentacion is invalid
+    """
+    if not hasattr(self, 'presentacion'):
+        raise ValueError(f"Toppings '{self.nombre}' must have 'presentacion' property")
+    
+    if not self.presentacion or str(self.presentacion).strip() == '':
+        raise ValueError(f"Toppings '{self.nombre}' must have non-empty 'presentacion'")
+    
+    return True
+
+
+# Note: entity_type is 'Toppings' (plural), not 'Topping'
+MethodRegistry.register_validator('Toppings', validate_toppings_tipo)
+MethodRegistry.register_validator('Toppings', validate_toppings_presentacion)

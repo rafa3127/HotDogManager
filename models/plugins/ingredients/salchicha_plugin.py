@@ -11,29 +11,30 @@ from models.core.method_registry import MethodRegistry
 
 
 # Register method to compare sizes with Pan
+# Note: Uses normalized key 'tamano' (no accent)
 MethodRegistry.register_method(
     'Salchicha',
     'matches_size',
-    lambda self, other: hasattr(self, 'tamaño') and hasattr(other, 'tamaño') and self.tamaño == other.tamaño
+    lambda self, other: hasattr(self, 'tamano') and hasattr(other, 'tamano') and self.tamano == other.tamano
 )
 
 
 # Register validators
-def validate_salchicha_tamaño(self) -> bool:
+def validate_salchicha_tamano(self) -> bool:
     """
-    Validate tamaño property.
+    Validate tamano property (normalized from tamaño).
     
     Returns:
         True if valid
     
     Raises:
-        ValueError: If tamaño is invalid
+        ValueError: If tamano is invalid
     """
-    if not hasattr(self, 'tamaño'):
-        raise ValueError(f"Salchicha '{self.nombre}' must have 'tamaño' property")
+    if not hasattr(self, 'tamano'):
+        raise ValueError(f"Salchicha '{self.nombre}' must have 'tamano' property")
     
-    if self.tamaño <= 0:
-        raise ValueError(f"Salchicha '{self.nombre}' must have positive tamaño, got {self.tamaño}")
+    if self.tamano <= 0:
+        raise ValueError(f"Salchicha '{self.nombre}' must have positive tamano, got {self.tamano}")
     
     return True
 
@@ -57,5 +58,5 @@ def validate_salchicha_unidad(self) -> bool:
     return True
 
 
-MethodRegistry.register_validator('Salchicha', validate_salchicha_tamaño)
+MethodRegistry.register_validator('Salchicha', validate_salchicha_tamano)
 MethodRegistry.register_validator('Salchicha', validate_salchicha_unidad)

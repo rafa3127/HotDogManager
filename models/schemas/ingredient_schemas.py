@@ -91,10 +91,11 @@ def infer_schemas_from_data(raw_data: List[Dict[str, Any]]) -> Tuple[Dict[str, L
 
 
 # Hardcoded fallback schemas if data inference fails
+# Note: Keys are normalized (no accents, capitalized)
 INGREDIENT_SCHEMAS_FALLBACK = {
     'Pan': ['tipo', 'tamano', 'unidad'],
     'Salchicha': ['tipo', 'tamano', 'unidad'],
-    'Acompañante': ['tipo', 'tamano', 'unidad'],
+    'Acompanante': ['tipo', 'tamano', 'unidad'],  # Normalized: no ñ
     'Salsa': ['base', 'color'],
     'Toppings': ['tipo', 'presentacion']
 }

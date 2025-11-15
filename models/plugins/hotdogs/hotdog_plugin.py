@@ -11,6 +11,7 @@ from models.core.method_registry import MethodRegistry
 
 
 # Register methods
+# Note: All keys are normalized (lowercase, no accents)
 MethodRegistry.register_method(
     'HotDog',
     'has_toppings',
@@ -26,7 +27,7 @@ MethodRegistry.register_method(
 MethodRegistry.register_method(
     'HotDog',
     'is_combo',
-    lambda self: hasattr(self, 'Acompañante') and self.Acompañante is not None
+    lambda self: hasattr(self, 'acompanante') and self.acompanante is not None  # normalized: Acompañante -> acompanante
 )
 
 
@@ -43,23 +44,23 @@ def validate_hotdog_nombre(self) -> bool:
 
 
 def validate_hotdog_pan(self) -> bool:
-    """Validate Pan property."""
-    if not hasattr(self, 'Pan'):
-        raise ValueError(f"HotDog '{self.nombre}' must have 'Pan' property")
+    """Validate pan property (normalized from Pan)."""
+    if not hasattr(self, 'pan'):
+        raise ValueError(f"HotDog '{self.nombre}' must have 'pan' property")
     
-    if not self.Pan or str(self.Pan).strip() == '':
-        raise ValueError(f"HotDog '{self.nombre}' must have non-empty 'Pan'")
+    if not self.pan or str(self.pan).strip() == '':
+        raise ValueError(f"HotDog '{self.nombre}' must have non-empty 'pan'")
     
     return True
 
 
 def validate_hotdog_salchicha(self) -> bool:
-    """Validate Salchicha property."""
-    if not hasattr(self, 'Salchicha'):
-        raise ValueError(f"HotDog '{self.nombre}' must have 'Salchicha' property")
+    """Validate salchicha property (normalized from Salchicha)."""
+    if not hasattr(self, 'salchicha'):
+        raise ValueError(f"HotDog '{self.nombre}' must have 'salchicha' property")
     
-    if not self.Salchicha or str(self.Salchicha).strip() == '':
-        raise ValueError(f"HotDog '{self.nombre}' must have non-empty 'Salchicha'")
+    if not self.salchicha or str(self.salchicha).strip() == '':
+        raise ValueError(f"HotDog '{self.nombre}' must have non-empty 'salchicha'")
     
     return True
 

@@ -11,7 +11,9 @@ def create_ingredient_entities(raw_data=None):
                   If None, uses fallback hardcoded schemas.
     
     Returns:
-        Tuple of (Ingredient, Pan, Salchicha, Topping, Salsa, Acompañante)
+        Dictionary mapping entity type names to their classes.
+        Includes 'Ingredient' (base class) and all specific types.
+        Example: {'Ingredient': IngredientClass, 'Pan': PanClass, ...}
     """
     import models.plugins.ingredients 
     
@@ -24,10 +26,7 @@ def create_ingredient_entities(raw_data=None):
     # Create specific classes
     entities = create_entities_from_schemas(specific_schemas, base_class=Ingredient)
     
-    Pan = entities['Pan']
-    Salchicha = entities['Salchicha']
-    Topping = entities['Topping']
-    Salsa = entities['Salsa']
-    Acompañante = entities['Acompañante']
+    # Add base class to the dict
+    entities['Ingredient'] = Ingredient
     
-    return Ingredient, Pan, Salchicha, Topping, Salsa, Acompañante
+    return entities

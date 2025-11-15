@@ -9,10 +9,11 @@ def create_hotdog_entities(raw_data=None):
         raw_data: Optional raw menu data to infer schemas from
     
     Returns:
-        HotDog class
+        Dictionary mapping entity type names to their classes.
+        Example: {'HotDog': HotDogClass}
     """
     import models.plugins.hotdogs
     schemas = get_hotdog_schemas(raw_data)
     entities = create_entities_from_schemas(schemas)
-    return entities['HotDog']
+    return entities
 

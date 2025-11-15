@@ -54,32 +54,36 @@ def infer_schemas_from_data(raw_data: List[Dict[str, Any]]) -> Tuple[Dict[str, L
     all_schemas = {}
     
     for category_data in raw_data:
-        categoria = category_data.get('Categoria')
-        opciones = category_data.get('Opciones', [])
-        
+        categoria = category_data.get('categoria')
+        opciones = category_data.get('opciones', [])
         if not categoria:
             continue
+        
+        # Capitalize entity_type to follow Python class naming conventions
+        entity_type = categoria.capitalize()
         
         if opciones and len(opciones) > 0:
             first_option = opciones[0]
             
-            # Extract all property names
+            # Extract all property names (excluding technical metadata)
             properties = []
             if 'nombre' in first_option:
                 properties.append('nombre')
             
             for key in first_option.keys():
-                if key not in properties and key != 'Categoria':
+                if key not in properties and key not in ['categoria', 'id']:
                     properties.append(key)
             
-            all_schemas[categoria] = properties
-    
+            all_schemas[entity_type] = properties
     # Find common properties
     common_properties = find_common_properties(all_schemas)
     
     # Remove common properties from individual schemas to avoid duplication
+    print(all_schemas)
     specific_schemas = {}
     for entity_type, properties in all_schemas.items():
+        print(entity_type)
+        print(properties)
         specific_props = [p for p in properties if p not in common_properties]
         specific_schemas[entity_type] = specific_props
     
@@ -88,11 +92,11 @@ def infer_schemas_from_data(raw_data: List[Dict[str, Any]]) -> Tuple[Dict[str, L
 
 # Hardcoded fallback schemas if data inference fails
 INGREDIENT_SCHEMAS_FALLBACK = {
-    'Pan': ['tipo', 'tamaño', 'unidad'],
-    'Salchicha': ['tipo', 'tamaño', 'unidad'],
-    'Topping': ['tipo'],
-    'Salsa': ['tipo'],
-    'Acompañante': ['tipo']
+    'Pan': ['tipo', 'tamano', 'unidad'],
+    'Salchicha': ['tipo', 'tamano', 'unidad'],
+    'Acompañante': ['tipo', 'tamano', 'unidad'],
+    'Salsa': ['base', 'color'],
+    'Toppings': ['tipo', 'presentacion']
 }
 
 INGREDIENT_BASE_PROPERTIES_FALLBACK = ['nombre']

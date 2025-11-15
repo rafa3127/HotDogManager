@@ -895,6 +895,73 @@ clients/
 
 ---
 
-**Última actualización**: NOV 14, 2025 - Rafael Correa
+#### Exclusión de 'id' de Schemas (CRÍTICO)
+
+**Decisión:** El campo `id` se excluye de la inferencia de schemas, aunque está presente en los datos procesados.
+
+**Problema:**
+- IDAdapter agrega `id` a todos los datos para identificación única
+- Al inferir schemas, `id` aparecía como propiedad común en todos los tipos
+- Fallback schemas NO tenían `id` (porque no conocen el sistema de adapters)
+- Inconsistencia: schemas inferidos ≠ schemas de fallback
+
+**Solución:**
+- Excluir `id` explícitamente durante la inferencia
+- Tratar `id` como metadata técnica, NO como propiedad de dominio
+- Schemas solo contienen propiedades del modelo de negocio
+
+**Ventajas:**
+- Consistencia total entre schemas inferidos y fallback
+- Separación clara: metadata técnica vs propiedades de dominio
+- Schemas reflejan el **modelo de negocio** (qué es un Pan), no la implementación
+- El `id` sigue estando en las instancias (viene de los datos)
+
+**Por qué 'id' es metadata técnica:**
+- Es agregado por el sistema (IDAdapter), no viene del dominio
+- No describe qué ES un ingrediente, sino cómo lo IDENTIFICAMOS
+- Si cambias el sistema de IDs (ej: a secuencial), el dominio no cambia
+- Similar a timestamps, created_by, etc. en otros sistemas
+
+**Fecha:** NOV 15, 2025
+
+---
+
+#### 12. Capitalización Automática de Entity Types
+
+**Decisión:** Los nombres de categorías en los datos se capitalizan automáticamente para generar nombres de clase válidos en PascalCase.
+
+**Problema:**
+- KeyNormalizationAdapter normaliza claves a minúsculas: `"Categoria"` → `"categoria"`, `"Pan"` → `"pan"`
+- Datos normalizados vienen como: `{"categoria": "pan"}`, `{"categoria": "toppings"}`
+- Nombres de clases en Python deben ser PascalCase: `Pan`, `Salchicha`, `Toppings`
+- Sin capitalización: EntityFactory generaría clases `pan`, `toppings` (inválidas)
+
+**Solución:**
+- Aplicar `.capitalize()` al extraer el entity_type durante la inferencia
+- Convierte automáticamente: `"pan"` → `"Pan"`, `"toppings"` → `"Toppings"`
+
+**Nota importante sobre plurales:**
+- El sistema respeta el nombre EXACTO de la categoría en los datos
+- Ejemplo: `"toppings"` → `"Toppings"` (mantiene el plural)
+- No se aplica singularización porque es complejo en español
+- Si los datos dicen `"topping"` (singular), el schema será `"Topping"`
+
+**Consistencia con fallback:**
+- El fallback debe usar los mismos nombres capitalizados
+- Ejemplo correcto: `INGREDIENT_SCHEMAS_FALLBACK = {'Toppings': [...]}`
+- Ejemplo incorrecto: `{'Topping': [...]}` → Inconsistencia con datos reales
+
+**Ventajas:**
+- Nombres de clase válidos automáticamente
+- Convención PascalCase respetada
+- Consistencia entre datos y código generado
+- No requiere configuración manual
+
+**Limitación conocida:**
+- `.capitalize()` solo capitaliza primera letra: `"toppings"` → `"Toppings"` ✅
+- Para multi-palabra necesitaríamos `.title()`: `"hot_dog"` → `"Hot_Dog"`
+- Suficiente para el caso de uso actual (categorías de una palabra)
+
+**Fecha:** NOV 15, 2025
 
 

@@ -31,15 +31,15 @@ def infer_hotdog_schema(raw_data: List[Dict[str, Any]]) -> Dict[str, List[str]]:
     # Get properties from first hot dog
     first_hotdog = raw_data[0]
     
-    # Extract all property names
+    # Extract all property names (excluding technical metadata)
     # Keep 'nombre' first if it exists
     properties = []
     if 'nombre' in first_hotdog:
         properties.append('nombre')
     
-    # Add remaining properties
+    # Add remaining properties (excluding 'id' which is technical metadata)
     for key in first_hotdog.keys():
-        if key not in properties:
+        if key not in properties and key != 'id':
             properties.append(key)
     
     return {'HotDog': properties}
@@ -47,7 +47,7 @@ def infer_hotdog_schema(raw_data: List[Dict[str, Any]]) -> Dict[str, List[str]]:
 
 # Hardcoded fallback schema if data inference fails
 HOTDOG_SCHEMAS_FALLBACK = {
-    'HotDog': ['nombre', 'Pan', 'Salchicha', 'toppings', 'salsas', 'Acompañante']
+    'HotDog': ['nombre', 'pan', 'salchicha', 'toppings', 'salsas', 'acompanante']
 }
 
 

@@ -71,7 +71,7 @@ def infer_schemas_from_data(raw_data: List[Dict[str, Any]]) -> Tuple[Dict[str, L
                 properties.append('nombre')
             
             for key in first_option.keys():
-                if key not in properties and key not in ['categoria', 'id']:
+                if key not in properties and key not in ['categoria', 'id', 'entity_type']:
                     properties.append(key)
             
             all_schemas[entity_type] = properties

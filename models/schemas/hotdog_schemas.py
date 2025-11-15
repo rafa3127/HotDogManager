@@ -37,9 +37,9 @@ def infer_hotdog_schema(raw_data: List[Dict[str, Any]]) -> Dict[str, List[str]]:
     if 'nombre' in first_hotdog:
         properties.append('nombre')
     
-    # Add remaining properties (excluding 'id' which is technical metadata)
+    # Add remaining properties (excluding 'id' and 'entity_type' which are technical metadata)
     for key in first_hotdog.keys():
-        if key not in properties and key != 'id':
+        if key not in properties and key not in ['id', 'entity_type']:
             properties.append(key)
     
     return {'HotDog': properties}

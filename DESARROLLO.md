@@ -39,9 +39,9 @@ Construir la base del sistema de persistencia y acceso a datos con abstracción 
   - [x] Plugins completos: 6 ingredientes + 1 hotdog
   - [x] Funciones de creación de entidades exportadas
   - [x] Tests exhaustivos del sistema completo
-- [ ] Sistema de colecciones genérico con operaciones CRUD
-- [ ] Colecciones especializadas por tipo de dato
-- [ ] Handler central que orqueste todas las colecciones
+- [x] Sistema de colecciones genérico con operaciones CRUD
+- [x] Colecciones especializadas por tipo de dato
+- [x] Handler central que orqueste todas las colecciones
 
 ---
 
@@ -964,4 +964,125 @@ clients/
 
 **Fecha:** NOV 15, 2025
 
+# Notas de Desarrollo - Sistema de Collections
 
+**Fecha:** 15 de noviembre de 2025
+
+## Decisiones de Diseño - Collections
+
+### 1. Una Collection por Archivo (No por Categoría)
+**Decisión:** IngredientCollection maneja TODO el archivo ingredientes.json, no crear colecciones separadas por categoría (PanCollection, SalsaCollection, etc.)
+
+**Razón:**
+- Mapeo 1:1 con archivos de datos
+- Sin race conditions ni sincronización compleja
+- Flush atómico de todo el archivo
+- Evita pérdida de datos al guardar
+
+**Alternativa rechazada:** Múltiples instancias por categoría requeriría merge manual constante
+
+**Fecha:** NOV 15, 2025
+
+---
+
+### 2. Filtrado de `entity_type` al Cargar Datos
+**Decisión:** Filtrar `entity_type` del dict antes de crear entidades
+
+**Implementación:**
+```python
+clean_data = {k: v for k, v in item_data.items() if k != 'entity_type'}
+entity = EntityClass(**clean_data, entity_type=entity_type)
+```
+
+**Problema que resuelve:**
+- `to_dict()` serializa `entity_type` en los archivos guardados
+- Al reload, data incluye `entity_type`
+- Pasar `entity_type` otra vez causa "duplicate keyword argument"
+
+**Fecha:** NOV 15, 2025
+
+---
+
+### 3. Exclusión de `entity_type` en Schemas
+**Decisión:** Excluir `entity_type` durante inferencia de schemas (igual que `id`)
+
+**Implementación:**
+```python
+# En ingredient_schemas.py y hotdog_schemas.py
+if key not in ['id', 'entity_type']:
+    properties.append(key)
+```
+
+**Razón:**
+- `entity_type` es metadata técnica, no propiedad del dominio
+- Schemas reflejan modelo de negocio, no implementación
+- Consistencia entre schemas inferidos y fallback
+
+**Fecha:** NOV 15, 2025
+
+---
+
+### 4. DataHandler con Referencias Directas
+**Decisión:** Collections como atributos públicos, no en diccionario
+
+**Implementación:**
+```python
+self.ingredientes = IngredientCollection(data_source)
+self.menu = HotDogCollection(data_source)
+# NO: self.collections = {'ingredientes': ..., 'menu': ...}
+```
+
+**Razón:**
+- `handler.ingredientes.add()` más claro que `handler.collections['ingredientes'].add()`
+- Autocompletado funciona
+- Más pythonic
+
+**Fecha:** NOV 15, 2025
+
+---
+
+### 5. Validación Automática en add/update
+**Decisión:** BaseCollection llama `entity.validate()` automáticamente en `add()` y `update()`
+
+**Razón:**
+- Fail early
+- Collections siempre tienen data válida
+- Usa el sistema de plugins ya implementado
+- DRY - no repetir validación en cada uso
+
+**Fecha:** NOV 15, 2025
+
+---
+
+### 6. Context Manager para Auto-commit/rollback
+**Decisión:** DataHandler implementa `__enter__` y `__exit__` para transacciones automáticas
+
+**Comportamiento:**
+- Success → auto-commit al salir del `with`
+- Exception → auto-rollback
+- Excepciones se propagan (no se suprimen)
+
+**Razón:**
+- Conveniencia para casos de uso simples
+- Garantiza rollback en errores
+- Pattern común en Python (similar a archivos, DB connections)
+
+**Fecha:** NOV 15, 2025
+
+---
+
+## Testing
+
+**Tests implementados:** 9 test suites (TODOS PASANDO)
+- BaseCollection functionality via subclases concretas
+- IngredientCollection: Load, CRUD, Validation
+- HotDogCollection: Load, CRUD, Validation
+- DataHandler: Unit of Work, Convenience, Context Manager
+
+**Características:**
+- DataSource real (no mocks) → Integration testing
+- Temporary directories → Aislamiento completo
+- Verificación de persistencia entre instancias
+- Negative testing (errores esperados)
+
+**Fecha:** NOV 15, 2025

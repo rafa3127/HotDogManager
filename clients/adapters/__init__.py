@@ -14,5 +14,6 @@ Date: November 14, 2025
 from .id_adapter import IDAdapter
 from .key_normalization_adapter import KeyNormalizationAdapter
 from .stock_initialization_adapter import StockInitializationAdapter
+from .ingredient_reference_adapter import IngredientReferenceAdapter
 
-__all__ = ['IDAdapter', 'KeyNormalizationAdapter', 'StockInitializationAdapter']
+__all__ = ['IDAdapter', 'KeyNormalizationAdapter', 'StockInitializationAdapter', 'IngredientReferenceAdapter']

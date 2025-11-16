@@ -28,6 +28,7 @@ from .ventas_actions import (
     action_view_sales,
     action_view_sales_by_date,
     action_sales_statistics,
+    action_simulate_day,
 )
 
 __all__ = [
@@ -50,4 +51,5 @@ __all__ = [
     'action_view_sales',
     'action_view_sales_by_date',
     'action_sales_statistics',
+    'action_simulate_day',
 ]

@@ -11,6 +11,7 @@ from cli.actions import (
     action_view_sales,
     action_view_sales_by_date,
     action_sales_statistics,
+    action_simulate_day,
 )
 
 
@@ -38,13 +39,18 @@ def create_ventas_menu() -> MenuDefinition:
             ),
             MenuOption(
                 key='3',
-                label='Ver ventas por fecha',
+                label='Ver ventas por fecha/rango',
                 action=action_view_sales_by_date
             ),
             MenuOption(
                 key='4',
                 label='Estadísticas de ventas',
                 action=action_sales_statistics
+            ),
+            MenuOption(
+                key='5',
+                label='🎲 Simular día de ventas',
+                action=action_simulate_day
             ),
         ],
         parent_menu='main',

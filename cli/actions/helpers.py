@@ -15,22 +15,20 @@ from typing import Dict, List
 # CATEGORY NORMALIZATION
 # ──────────────────────────────────────────────────────
 
-# Mapping from normalized category names (data) to display names (UI)
 CATEGORY_DISPLAY_NAMES: Dict[str, str] = {
     'pan': 'Pan',
     'salchicha': 'Salchicha',
-    'acompañante': 'Acompañante',  # Con ñ para display
-    'acompanante': 'Acompañante',  # Sin ñ también mapea (redundante pero útil)
+    'acompañante': 'Acompañante',
+    'acompanante': 'Acompañante',
     'salsa': 'Salsa',
     'toppings': 'Toppings'
 }
 
 # Mapping from display names to entity class names
-# NOTA: Las clases SIEMPRE se crean sin ñ ni acentos
 CATEGORY_TO_CLASS: Dict[str, str] = {
     'Pan': 'Pan',
     'Salchicha': 'Salchicha',
-    'Acompañante': 'Acompanante',  # Clase SIN ñ (normalizada)
+    'Acompañante': 'Acompanante',  
     'Salsa': 'Salsa',
     'Toppings': 'Toppings'
 }

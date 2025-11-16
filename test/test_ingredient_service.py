@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from clients.external_sources.github_client import GitHubClient
 from clients.adapters.id_adapter import IDAdapter
 from clients.adapters.key_normalization_adapter import KeyNormalizationAdapter
+from clients.adapters.stock_initialization_adapter import StockInitializationAdapter
 from clients.data_source_client import DataSourceClient
 from clients.id_processors import process_grouped_structure_ids, process_flat_structure_ids
 from handlers.data_handler import DataHandler
@@ -27,14 +28,11 @@ import config
 
 def setup_test_handler():
     """
-    Setup a DataHandler with real GitHub data in a temporary directory.
+    Setup a DataHandler with real GitHub data in the real data/ directory.
     
     Returns:
-        tuple: (handler, temp_dir) - DataHandler instance and temp directory path
+        DataHandler instance
     """
-    # Create temporary directory for test data
-    temp_dir = tempfile.mkdtemp(prefix='hotdog_test_')
-    
     # Setup GitHub client with adapters (same as production)
     github = GitHubClient(
         owner=config.GITHUB_OWNER,
@@ -42,16 +40,27 @@ def setup_test_handler():
         branch=config.GITHUB_BRANCH
     )
     
-    # Ingredientes: GROUPED structure
+    # Ingredientes: GROUPED structure with stock
     ingredientes_with_ids = IDAdapter(github, process_grouped_structure_ids)
-    ingredientes_processed = KeyNormalizationAdapter(ingredientes_with_ids)
+    ingredientes_normalized = KeyNormalizationAdapter(ingredientes_with_ids)
+    ingredientes_processed = StockInitializationAdapter(
+        ingredientes_normalized,
+        default_stock=50,
+        stock_by_category={
+            'pan': 100,
+            'salchicha': 75,
+            'toppings': 200,
+            'salsa': 150,
+            'acompañante': 80
+        }
+    )
     
     # Menu: FLAT structure
     menu_with_ids = IDAdapter(github, process_flat_structure_ids)
     menu_processed = KeyNormalizationAdapter(menu_with_ids)
     
-    # Initialize DataSource with temporary directory
-    data_source = DataSourceClient(data_dir=temp_dir)
+    # Initialize DataSource with REAL data directory
+    data_source = DataSourceClient(data_dir='data')
     data_source.initialize({
         'ingredientes': ingredientes_processed,
         'menu': menu_processed
@@ -60,14 +69,16 @@ def setup_test_handler():
     # Create DataHandler
     handler = DataHandler(data_source)
     
-    return handler, temp_dir
+    return handler
 
 
-def teardown_test_handler(temp_dir):
-    """Clean up temporary directory."""
-    if os.path.exists(temp_dir):
-        shutil.rmtree(temp_dir)
-        print(f"🧹 Cleaned up temporary directory: {temp_dir}")
+def teardown_test_handler(handler):
+    """Commit changes to persist them to data/ directory."""
+    if handler.has_changes:
+        handler.commit()
+        print(f"💾 Changes saved to data/ directory")
+    else:
+        print(f"ℹ️  No changes to save")
 
 
 def test_list_by_category():
@@ -76,7 +87,7 @@ def test_list_by_category():
     print("🧪 Test 1: IngredientService.list_by_category()")
     print("=" * 70)
     
-    handler, temp_dir = setup_test_handler()
+    handler = setup_test_handler()
     
     try:
         # Test with 'Pan' category
@@ -102,7 +113,7 @@ def test_list_by_category():
         print("\n✅ Test 1 PASSED: list_by_category works correctly")
         
     finally:
-        teardown_test_handler(temp_dir)
+        teardown_test_handler(handler)
 
 
 def test_list_by_type():
@@ -111,7 +122,7 @@ def test_list_by_type():
     print("🧪 Test 2: IngredientService.list_by_type()")
     print("=" * 70)
     
-    handler, temp_dir = setup_test_handler()
+    handler = setup_test_handler()
     
     try:
         # Get all panes first
@@ -145,7 +156,7 @@ def test_list_by_type():
         print("\n✅ Test 2 PASSED: list_by_type works correctly")
         
     finally:
-        teardown_test_handler(temp_dir)
+        teardown_test_handler(handler)
 
 
 def test_add_ingredient():
@@ -154,7 +165,7 @@ def test_add_ingredient():
     print("🧪 Test 3: IngredientService.add_ingredient()")
     print("=" * 70)
     
-    handler, temp_dir = setup_test_handler()
+    handler = setup_test_handler()
     
     try:
         # Get initial count
@@ -232,7 +243,7 @@ def test_add_ingredient():
         print("\n✅ Test 3 PASSED: add_ingredient works correctly")
         
     finally:
-        teardown_test_handler(temp_dir)
+        teardown_test_handler(handler)
 
 
 def test_delete_ingredient_simple():
@@ -241,7 +252,7 @@ def test_delete_ingredient_simple():
     print("🧪 Test 4: IngredientService.delete_ingredient() - Simple case")
     print("=" * 70)
     
-    handler, temp_dir = setup_test_handler()
+    handler = setup_test_handler()
     
     try:
         # Add a test ingredient that won't be used
@@ -276,7 +287,7 @@ def test_delete_ingredient_simple():
         print("\n✅ Test 4 PASSED: delete_ingredient (simple) works correctly")
         
     finally:
-        teardown_test_handler(temp_dir)
+        teardown_test_handler(handler)
 
 
 def test_delete_ingredient_with_menu_dependencies():
@@ -285,7 +296,7 @@ def test_delete_ingredient_with_menu_dependencies():
     print("🧪 Test 5: IngredientService.delete_ingredient() - With menu dependencies")
     print("=" * 70)
     
-    handler, temp_dir = setup_test_handler()
+    handler = setup_test_handler()
     
     try:
         # Find an ingredient that's used in the menu
@@ -351,7 +362,7 @@ def test_delete_ingredient_with_menu_dependencies():
         print("\n✅ Test 5 PASSED: delete_ingredient (with dependencies) works correctly")
         
     finally:
-        teardown_test_handler(temp_dir)
+        teardown_test_handler(handler)
 
 
 def test_delete_nonexistent_ingredient():
@@ -360,7 +371,7 @@ def test_delete_nonexistent_ingredient():
     print("🧪 Test 6: IngredientService.delete_ingredient() - Non-existent")
     print("=" * 70)
     
-    handler, temp_dir = setup_test_handler()
+    handler = setup_test_handler()
     
     try:
         # Try to delete ingredient that doesn't exist
@@ -377,7 +388,232 @@ def test_delete_nonexistent_ingredient():
         print("\n✅ Test 6 PASSED: Correctly handles non-existent ingredient")
         
     finally:
-        teardown_test_handler(temp_dir)
+        teardown_test_handler(handler)
+
+
+def test_get_full_inventory():
+    """Test 7: Get full inventory."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 7: IngredientService.get_full_inventory()")
+    print("=" * 70)
+    
+    handler = setup_test_handler()
+    
+    try:
+        # Get full inventory
+        inventory = IngredientService.get_full_inventory(handler)
+        
+        print(f"\n📊 Total ingredients in inventory: {len(inventory)}")
+        
+        assert len(inventory) > 0, "Inventory should not be empty"
+        
+        # Check some stock values
+        print("\n🔍 Sample inventory:")
+        count = 0
+        for ing_id, stock in inventory.items():
+            ing = handler.ingredientes.get(ing_id)
+            if ing and count < 5:
+                print(f"   {ing.nombre:20s} ({ing.entity_type:15s}) → stock: {stock}")
+                count += 1
+                
+                # Verify stock is initialized
+                assert stock >= 0, "Stock should be non-negative"
+        
+        print("\n✅ Test 7 PASSED: get_full_inventory works correctly")
+        
+    finally:
+        teardown_test_handler(handler)
+
+
+def test_get_stock():
+    """Test 8: Get stock for specific ingredient."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 8: IngredientService.get_stock()")
+    print("=" * 70)
+    
+    handler = setup_test_handler()
+    
+    try:
+        # Get a pan to test
+        panes = IngredientService.list_by_category(handler, 'Pan')
+        assert len(panes) > 0, "Need at least one pan for testing"
+        
+        pan = panes[0]
+        print(f"\n🍞 Testing with: {pan.nombre} (ID: {pan.id})")
+        
+        # Get stock
+        stock = IngredientService.get_stock(handler, pan.id)
+        
+        print(f"📊 Stock: {stock}")
+        
+        assert stock is not None, "Stock should not be None for existing ingredient"
+        assert stock == 100, "Pan should have stock=100 from initialization"
+        
+        # Test non-existent ingredient
+        stock_none = IngredientService.get_stock(handler, 'fake_id_999')
+        assert stock_none is None, "Non-existent ingredient should return None"
+        
+        print("\n✅ Test 8 PASSED: get_stock works correctly")
+        
+    finally:
+        teardown_test_handler(handler)
+
+
+def test_get_inventory_by_category():
+    """Test 9: Get inventory by category."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 9: IngredientService.get_inventory_by_category()")
+    print("=" * 70)
+    
+    handler = setup_test_handler()
+    
+    try:
+        # Get inventory for Pan category
+        inventory = IngredientService.get_inventory_by_category(handler, 'Pan')
+        
+        print(f"\n🍞 Inventory for Pan category: {len(inventory)} items")
+        
+        assert len(inventory) > 0, "Pan inventory should not be empty"
+        
+        # Display inventory
+        print("\n📊 Inventory details:")
+        for ing_id, details in list(inventory.items())[:5]:
+            print(f"   {details['nombre']:20s} - {details['tipo']:15s} → {details['stock']} units")
+            
+            # Verify structure
+            assert 'nombre' in details, "Details should have nombre"
+            assert 'stock' in details, "Details should have stock"
+            assert details['stock'] == 100, "All panes should have stock=100"
+        
+        print("\n✅ Test 9 PASSED: get_inventory_by_category works correctly")
+        
+    finally:
+        teardown_test_handler(handler)
+
+
+def test_update_stock():
+    """Test 10: Update stock (add and subtract)."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 10: IngredientService.update_stock()")
+    print("=" * 70)
+    
+    handler = setup_test_handler()
+    
+    try:
+        # Get a pan
+        panes = IngredientService.list_by_category(handler, 'Pan')
+        pan = panes[0]
+        
+        print(f"\n🍞 Testing with: {pan.nombre}")
+        
+        initial_stock = IngredientService.get_stock(handler, pan.id)
+        print(f"📊 Initial stock: {initial_stock}")
+        
+        # Add stock
+        result_add = IngredientService.update_stock(handler, pan.id, 50)
+        
+        print(f"\n➕ Adding 50 units:")
+        print(f"   Exito: {result_add['exito']}")
+        print(f"   Stock anterior: {result_add['stock_anterior']}")
+        print(f"   Stock nuevo: {result_add['stock_nuevo']}")
+        
+        assert result_add['exito'] == True, "Should add stock successfully"
+        assert result_add['stock_nuevo'] == initial_stock + 50, "Stock should increase by 50"
+        
+        # Verify stock was updated
+        current_stock = IngredientService.get_stock(handler, pan.id)
+        assert current_stock == initial_stock + 50, "Stock should persist"
+        
+        # Subtract stock
+        result_sub = IngredientService.update_stock(handler, pan.id, -30)
+        
+        print(f"\n➖ Subtracting 30 units:")
+        print(f"   Exito: {result_sub['exito']}")
+        print(f"   Stock anterior: {result_sub['stock_anterior']}")
+        print(f"   Stock nuevo: {result_sub['stock_nuevo']}")
+        
+        assert result_sub['exito'] == True, "Should subtract stock successfully"
+        assert result_sub['stock_nuevo'] == initial_stock + 50 - 30, "Stock should decrease by 30"
+        
+        # Test negative stock (should fail)
+        result_neg = IngredientService.update_stock(handler, pan.id, -10000)
+        
+        print(f"\n🚫 Attempting negative stock:")
+        print(f"   Exito: {result_neg['exito']}")
+        print(f"   Error: {result_neg.get('error', 'N/A')}")
+        
+        assert result_neg['exito'] == False, "Should not allow negative stock"
+        assert 'error' in result_neg, "Should return error message"
+        
+        print("\n✅ Test 10 PASSED: update_stock works correctly")
+        
+    finally:
+        teardown_test_handler(handler)
+
+
+def test_check_hotdog_availability():
+    """Test 11: Check if hot dog can be made with current inventory."""
+    print("\n" + "=" * 70)
+    print("🧪 Test 11: IngredientService.check_hotdog_availability()")
+    print("=" * 70)
+    
+    handler = setup_test_handler()
+    
+    try:
+        # Get a hotdog
+        hotdogs = handler.menu.get_all()
+        assert len(hotdogs) > 0, "Need at least one hotdog for testing"
+        
+        hotdog = hotdogs[0]
+        print(f"\n🌭 Testing hotdog: {hotdog.nombre} (ID: {hotdog.id})")
+        
+        # Check availability (should be available with initial stock)
+        result = IngredientService.check_hotdog_availability(handler, hotdog.id)
+        
+        print(f"\n🔍 Availability check:")
+        print(f"   Disponible: {result['disponible']}")
+        print(f"   Faltantes: {len(result.get('faltantes', []))}")
+        
+        assert 'disponible' in result, "Result should have 'disponible' field"
+        assert 'faltantes' in result, "Result should have 'faltantes' field"
+        
+        if result['disponible']:
+            print("✅ Hot dog can be made with current inventory")
+        else:
+            print("⚠️  Missing ingredients:")
+            for faltante in result['faltantes']:
+                print(f"      - {faltante['ingrediente']} ({faltante['categoria']}): needs {faltante['necesita']}, has {faltante['disponible']}")
+        
+        # Now deplete stock and check again
+        print(f"\n📦 Depleting stock of pan...")
+        if hasattr(hotdog, 'pan'):
+            pan = handler.ingredientes.get_by_name(hotdog.pan, 'Pan')
+            if pan:
+                IngredientService.update_stock(handler, pan.id, -100)  # Remove all stock
+                
+                result_depleted = IngredientService.check_hotdog_availability(handler, hotdog.id)
+                
+                print(f"\n🔍 After depleting pan:")
+                print(f"   Disponible: {result_depleted['disponible']}")
+                print(f"   Faltantes: {len(result_depleted.get('faltantes', []))}")
+                
+                assert result_depleted['disponible'] == False, "Should not be available without pan"
+                assert len(result_depleted['faltantes']) > 0, "Should have faltantes"
+                
+                # Check that pan is in faltantes
+                pan_faltante = any(f['ingrediente'] == hotdog.pan for f in result_depleted['faltantes'])
+                assert pan_faltante, "Pan should be in faltantes list"
+                
+                print("✅ Correctly detected missing ingredient")
+        
+        # Test non-existent hotdog
+        result_none = IngredientService.check_hotdog_availability(handler, 'fake_hotdog_999')
+        assert 'error' in result_none, "Should return error for non-existent hotdog"
+        
+        print("\n✅ Test 11 PASSED: check_hotdog_availability works correctly")
+        
+    finally:
+        teardown_test_handler(handler)
 
 
 def run_all_tests():
@@ -393,6 +629,11 @@ def run_all_tests():
         ("Delete ingredient (simple)", test_delete_ingredient_simple),
         ("Delete ingredient (dependencies)", test_delete_ingredient_with_menu_dependencies),
         ("Delete non-existent", test_delete_nonexistent_ingredient),
+        ("Get full inventory", test_get_full_inventory),
+        ("Get stock", test_get_stock),
+        ("Get inventory by category", test_get_inventory_by_category),
+        ("Update stock", test_update_stock),
+        ("Check hotdog availability", test_check_hotdog_availability),
     ]
     
     passed = 0

@@ -21,6 +21,7 @@ from clients.adapters.key_normalization_adapter import (
     normalize_key,
     normalize_keys_recursive
 )
+from clients.adapters.stock_initialization_adapter import StockInitializationAdapter
 from clients.id_processors import (
     generate_stable_id,
     process_grouped_structure_ids,
@@ -616,6 +617,92 @@ def test_data_source_client_with_all_adapters():
     print("=" * 50 + "\n")
 
 
+def test_stock_initialization_adapter():
+    """Test 9: Stock Initialization Adapter adds stock field to ingredients."""
+    print("🧪 Test 9: Stock Initialization Adapter")
+    print("=" * 50)
+    
+    # Setup GitHub client
+    github = GitHubClient(
+        owner=config.GITHUB_OWNER,
+        repo=config.GITHUB_REPO,
+        branch=config.GITHUB_BRANCH
+    )
+    
+    # Build full chain WITH stock adapter
+    print("\n🔗 Building adapter chain with stock initialization...")
+    with_ids = IDAdapter(github, process_grouped_structure_ids)
+    normalized = KeyNormalizationAdapter(with_ids)
+    with_stock = StockInitializationAdapter(
+        normalized,
+        default_stock=50,
+        stock_by_category={
+            'pan': 100,
+            'salchicha': 75,
+            'toppings': 200,
+            'salsa': 150,
+            'acompañante': 80
+        }
+    )
+    
+    # Initialize DataSource with stock adapter
+    data_source = DataSourceClient(data_dir='data')
+    data_source.initialize(
+        sources={'ingredientes': with_stock},
+        force_external=True
+    )
+    
+    # Verify stock was added
+    print("\n✅ DataSource initialized with stock adapter")
+    ingredientes = data_source.get('ingredientes')
+    
+    print("\n🔍 Checking stock values by category:")
+    for category_data in ingredientes:
+        categoria = category_data.get('categoria', 'unknown')
+        opciones = category_data.get('opciones', [])
+        
+        if opciones:
+            first_item = opciones[0]
+            stock = first_item.get('stock', 'NOT FOUND')
+            nombre = first_item.get('nombre', 'unknown')
+            
+            print(f"   {categoria.capitalize():15s} - {nombre:20s} → stock: {stock}")
+            
+            # Verify stock exists
+            assert 'stock' in first_item, f"Stock field missing in {categoria}"
+            
+            # Verify correct value based on category
+            if categoria == 'pan':
+                assert stock == 100, f"Pan should have stock=100, got {stock}"
+            elif categoria == 'salchicha':
+                assert stock == 75, f"Salchicha should have stock=75, got {stock}"
+            elif categoria == 'toppings':
+                assert stock == 200, f"Toppings should have stock=200, got {stock}"
+            elif categoria == 'salsa':
+                assert stock == 150, f"Salsa should have stock=150, got {stock}"
+            elif categoria == 'acompañante':
+                assert stock == 80, f"Acompañante should have stock=80, got {stock}"
+    
+    print("\n✅ All categories have correct stock values")
+    
+    # Verify persistence
+    print("\n💾 Verifying stock was persisted to data/ingredientes.json...")
+    import json
+    with open('data/ingredientes.json', 'r', encoding='utf-8') as f:
+        saved_data = json.load(f)
+    
+    # Check first item has stock in file
+    first_category = saved_data[0]
+    first_option = first_category['opciones'][0]
+    assert 'stock' in first_option, "Stock field should be persisted to file"
+    print(f"✅ Stock field persisted: {first_option['nombre']} has stock={first_option['stock']}")
+    
+    print("\n" + "=" * 50)
+    print("🎉 Stock Initialization Adapter test passed!")
+    print("📄 File data/ingredientes.json now contains stock field")
+    print("=" * 50 + "\n")
+
+
 def run_all_tests():
     """Run all tests in sequence."""
     print("\n" + "=" * 60)
@@ -640,6 +727,8 @@ def run_all_tests():
         test_chained_adapters()
         print()
         test_data_source_client_with_all_adapters()
+        print()
+        test_stock_initialization_adapter()
         
         print("=" * 60)
         print("✅ ALL TESTS PASSED!")
@@ -653,6 +742,7 @@ def run_all_tests():
         print("   ✅ ID Adapter")
         print("   ✅ Chained Adapters")
         print("   ✅ DataSourceClient Integration (Full)")
+        print("   ✅ Stock Initialization Adapter")
         print("\n🎉 System ready for Fase 2 development!\n")
         
     except Exception as e:

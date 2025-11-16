@@ -4,6 +4,8 @@ Ingredient Service
 Business logic for ingredient management operations.
 All methods are static and operate on a DataHandler instance.
 
+Includes both catalog management and inventory management.
+
 Author: Rafael Correa
 Date: November 15, 2025
 """
@@ -284,3 +286,282 @@ class IngredientService:
                 continue
         
         return hotdogs_usando
+    
+    # ═══════════════════════════════════════════════════════════════
+    # INVENTORY MANAGEMENT
+    # ═══════════════════════════════════════════════════════════════
+    
+    @staticmethod
+    def get_full_inventory(handler: DataHandler) -> Dict[str, int]:
+        """
+        Get complete inventory of all ingredients.
+        
+        Args:
+            handler: DataHandler instance
+        
+        Returns:
+            Dict mapping ingredient_id to stock quantity
+            Example: {'pan_id_123': 100, 'salchicha_id_456': 75}
+        
+        Example:
+            >>> inventory = IngredientService.get_full_inventory(handler)
+            >>> for ing_id, stock in inventory.items():
+            ...     print(f"{ing_id}: {stock} units")
+        """
+        result = {}
+        
+        for ingredient in handler.ingredientes.get_all():
+            stock = getattr(ingredient, 'stock', 0)
+            result[ingredient.id] = stock
+        
+        return result
+    
+    @staticmethod
+    def get_stock(handler: DataHandler, ingrediente_id: str) -> Optional[int]:
+        """
+        Get stock quantity for a specific ingredient.
+        
+        Args:
+            handler: DataHandler instance
+            ingrediente_id: ID of the ingredient
+        
+        Returns:
+            Stock quantity, or None if ingredient not found
+        
+        Example:
+            >>> stock = IngredientService.get_stock(handler, 'pan_id_123')
+            >>> if stock is not None:
+            ...     print(f"Stock available: {stock}")
+        """
+        ingredient = handler.ingredientes.get(ingrediente_id)
+        
+        if not ingredient:
+            return None
+        
+        return getattr(ingredient, 'stock', 0)
+    
+    @staticmethod
+    def get_inventory_by_category(handler: DataHandler, categoria: str) -> Dict[str, Dict]:
+        """
+        Get inventory details for all ingredients in a category.
+        
+        Args:
+            handler: DataHandler instance
+            categoria: Category name (e.g., 'Pan', 'Salchicha')
+        
+        Returns:
+            Dict mapping ingredient_id to details dict with:
+                - nombre: Ingredient name
+                - tipo: Ingredient type (if exists)
+                - stock: Current stock quantity
+        
+        Example:
+            >>> inventory = IngredientService.get_inventory_by_category(handler, 'Pan')
+            >>> for ing_id, details in inventory.items():
+            ...     print(f"{details['nombre']}: {details['stock']} units")
+        """
+        result = {}
+        
+        ingredients = handler.ingredientes.get_by_category(categoria)
+        
+        for ingredient in ingredients:
+            stock = getattr(ingredient, 'stock', 0)
+            tipo = getattr(ingredient, 'tipo', None)
+            
+            result[ingredient.id] = {
+                'nombre': ingredient.nombre,
+                'tipo': tipo,
+                'stock': stock
+            }
+        
+        return result
+    
+    @staticmethod
+    def update_stock(
+        handler: DataHandler,
+        ingrediente_id: str,
+        cantidad: int
+    ) -> Dict[str, Any]:
+        """
+        Update stock for an ingredient (add or subtract).
+        
+        Args:
+            handler: DataHandler instance
+            ingrediente_id: ID of the ingredient
+            cantidad: Quantity to add (positive) or subtract (negative)
+        
+        Returns:
+            Dict with:
+                - 'exito': bool indicating success
+                - 'stock_anterior': Previous stock value
+                - 'stock_nuevo': New stock value
+                - 'error': Error message if failed
+        
+        Example:
+            >>> # Add 50 units
+            >>> result = IngredientService.update_stock(handler, 'pan_id', 50)
+            >>> # Subtract 10 units
+            >>> result = IngredientService.update_stock(handler, 'pan_id', -10)
+        """
+        try:
+            ingredient = handler.ingredientes.get(ingrediente_id)
+            
+            if not ingredient:
+                return {
+                    'exito': False,
+                    'error': f"Ingrediente con ID '{ingrediente_id}' no encontrado"
+                }
+            
+            # Get current stock
+            stock_anterior = getattr(ingredient, 'stock', 0)
+            
+            # Calculate new stock
+            stock_nuevo = stock_anterior + cantidad
+            
+            # Validate non-negative stock
+            if stock_nuevo < 0:
+                return {
+                    'exito': False,
+                    'stock_anterior': stock_anterior,
+                    'error': f"Stock no puede ser negativo. Stock actual: {stock_anterior}, intentó restar: {abs(cantidad)}"
+                }
+            
+            # Update stock
+            setattr(ingredient, 'stock', stock_nuevo)
+            
+            # Update in collection (marks dirty)
+            handler.ingredientes.update(ingredient)
+            
+            return {
+                'exito': True,
+                'stock_anterior': stock_anterior,
+                'stock_nuevo': stock_nuevo
+            }
+            
+        except Exception as e:
+            return {
+                'exito': False,
+                'error': f"Error al actualizar stock: {str(e)}"
+            }
+    
+    @staticmethod
+    def check_hotdog_availability(
+        handler: DataHandler,
+        hotdog_id: str
+    ) -> Dict[str, Any]:
+        """
+        Check if there's sufficient inventory to make a hot dog.
+        
+        Args:
+            handler: DataHandler instance
+            hotdog_id: ID of the hot dog to check
+        
+        Returns:
+            Dict with:
+                - 'disponible': bool indicating if all ingredients are available
+                - 'faltantes': List of dicts with missing ingredients:
+                    - 'ingrediente': Ingredient name
+                    - 'categoria': Ingredient category
+                    - 'necesita': Quantity needed (always 1)
+                    - 'disponible': Current stock
+                - 'error': Error message if hot dog not found
+        
+        Example:
+            >>> result = IngredientService.check_hotdog_availability(handler, 'hotdog_id')
+            >>> if result['disponible']:
+            ...     print("Can make this hot dog!")
+            >>> else:
+            ...     for faltante in result['faltantes']:
+            ...         print(f"Missing: {faltante['ingrediente']}")
+        """
+        try:
+            # Get hot dog
+            hotdog = handler.menu.get(hotdog_id)
+            
+            if not hotdog:
+                return {
+                    'disponible': False,
+                    'faltantes': [],
+                    'error': f"Hot dog con ID '{hotdog_id}' no encontrado"
+                }
+            
+            faltantes = []
+            
+            # Check pan
+            if hasattr(hotdog, 'pan') and hotdog.pan:
+                pan = handler.ingredientes.get_by_name(hotdog.pan, 'Pan')
+                if pan:
+                    stock = getattr(pan, 'stock', 0)
+                    if stock < 1:
+                        faltantes.append({
+                            'ingrediente': hotdog.pan,
+                            'categoria': 'Pan',
+                            'necesita': 1,
+                            'disponible': stock
+                        })
+            
+            # Check salchicha
+            if hasattr(hotdog, 'salchicha') and hotdog.salchicha:
+                salchicha = handler.ingredientes.get_by_name(hotdog.salchicha, 'Salchicha')
+                if salchicha:
+                    stock = getattr(salchicha, 'stock', 0)
+                    if stock < 1:
+                        faltantes.append({
+                            'ingrediente': hotdog.salchicha,
+                            'categoria': 'Salchicha',
+                            'necesita': 1,
+                            'disponible': stock
+                        })
+            
+            # Check toppings
+            if hasattr(hotdog, 'toppings') and hotdog.toppings:
+                for topping_name in hotdog.toppings:
+                    topping = handler.ingredientes.get_by_name(topping_name, 'Toppings')
+                    if topping:
+                        stock = getattr(topping, 'stock', 0)
+                        if stock < 1:
+                            faltantes.append({
+                                'ingrediente': topping_name,
+                                'categoria': 'Toppings',
+                                'necesita': 1,
+                                'disponible': stock
+                            })
+            
+            # Check salsas
+            if hasattr(hotdog, 'salsas') and hotdog.salsas:
+                for salsa_name in hotdog.salsas:
+                    salsa = handler.ingredientes.get_by_name(salsa_name, 'Salsa')
+                    if salsa:
+                        stock = getattr(salsa, 'stock', 0)
+                        if stock < 1:
+                            faltantes.append({
+                                'ingrediente': salsa_name,
+                                'categoria': 'Salsa',
+                                'necesita': 1,
+                                'disponible': stock
+                            })
+            
+            # Check acompanante
+            if hasattr(hotdog, 'acompanante') and hotdog.acompanante:
+                acompanante = handler.ingredientes.get_by_name(hotdog.acompanante, 'Acompañante')
+                if acompanante:
+                    stock = getattr(acompanante, 'stock', 0)
+                    if stock < 1:
+                        faltantes.append({
+                            'ingrediente': hotdog.acompanante,
+                            'categoria': 'Acompañante',
+                            'necesita': 1,
+                            'disponible': stock
+                        })
+            
+            return {
+                'disponible': len(faltantes) == 0,
+                'faltantes': faltantes
+            }
+            
+        except Exception as e:
+            return {
+                'disponible': False,
+                'faltantes': [],
+                'error': f"Error al verificar disponibilidad: {str(e)}"
+            }

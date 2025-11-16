@@ -51,8 +51,8 @@ Construir la base del sistema de persistencia y acceso a datos con abstracción 
 Implementar la lógica de orquestación entre colecciones y las validaciones de negocio específicas.
 
 ### Tareas
-- [ ] Servicio de gestión de ingredientes (listar, agregar, eliminar con cascada)
-- [ ] Servicio de gestión de inventario (visualizar, buscar, actualizar)
+- [x] Servicio de gestión de ingredientes (listar, agregar, eliminar con cascada)
+- [x] Servicio de gestión de inventario (visualizar, buscar, actualizar) (desarrollados como servicios de ingredients)
 - [ ] Servicio de gestión de menú (listar, agregar con validaciones, eliminar)
 - [ ] Servicio de procesamiento de ventas
 - [ ] Utilidades de formateo y validación
@@ -1085,4 +1085,87 @@ self.menu = HotDogCollection(data_source)
 - Verificación de persistencia entre instancias
 - Negative testing (errores esperados)
 
+## Notas de Desarrollo - Fase 2
+
+### Sistema de Inventario con Adapter Pattern
+**Decisión:** Implementar el inventario como un campo `stock` en los ingredientes en lugar de crear una colección separada.
+
+**Razones:**
+- El inventario ES parte de los ingredientes (mismo lifecycle, mismo contexto)
+- Evita duplicación y problemas de sincronización
+- Aprovecha la arquitectura data-driven existente (schemas se infieren automáticamente)
+
+**Implementación:** `StockInitializationAdapter` que agrega el campo `stock` a todos los ingredientes al cargar desde GitHub.
+- Se encadena después de `IDAdapter` y `KeyNormalizationAdapter`
+- Permite configurar stock inicial por categoría
+- Consistente con el patrón Adapter ya establecido
+- No modifica los datos de GitHub (solo agrega el campo localmente)
+```python
+# Cadena de adapters completa
+GitHub → IDs → KeyNormalization → StockInitialization → DataSource
+```
+
+### IngredientService: Catálogo + Inventario Unificado
+**Decisión:** Agregar métodos de inventario al `IngredientService` en lugar de crear un `InventoryService` separado.
+
+**Alternativas consideradas:**
+1. ❌ Métodos en la entidad Ingredient (violaría SRP, entidades deben ser DTOs)
+2. ❌ Métodos en IngredientCollection (mezclaría persistencia con lógica de negocio)
+3. ❌ InventoryService separado (dos servicios operando sobre la misma data, overhead innecesario)
+4. ✅ **IngredientService unificado** (catálogo + inventario juntos)
+
+**Razones:**
+- El inventario está intrínsecamente ligado a los ingredientes (mismo archivo, mismo schema)
+- Service layer es el lugar correcto para lógica de negocio
+- Mantiene cohesión: "todo lo relacionado con ingredientes en un solo lugar"
+- Consistente con la arquitectura de servicios estáticos con métodos standalone
+
+**Estructura final:**
+```python
+IngredientService:
+    # Gestión de Catálogo
+    - list_by_category()
+    - list_by_type()
+    - add_ingredient()
+    - delete_ingredient()  # Con validación de uso en menú
+    
+    # Gestión de Inventario
+    - get_full_inventory()
+    - get_stock()
+    - get_inventory_by_category()
+    - update_stock()  # Con validación de stock no negativo
+    - check_hotdog_availability()  # Verifica inventario para hacer un hotdog
+```
+
+### Testing con Persistencia Real
+**Decisión:** Los tests de servicios usan el directorio real `data/` en lugar de directorios temporales.
+
+**Razones:**
+- Permite ver los cambios realmente persistidos en los archivos JSON
+- Facilita debugging (puedes inspeccionar los archivos después de los tests)
+- Reset simple: `git checkout data/` o borrar archivos (se recargan desde GitHub)
+- Más cercano al uso real de la aplicación
+
+**Implementación:**
+- `setup_test_handler()` retorna solo `handler` (no tupla)
+- `teardown_test_handler(handler)` hace `handler.commit()` para persistir cambios
+- Incluye `StockInitializationAdapter` en el setup para que todos los ingredientes tengan stock
+
+### Schema Inference con Campo Stock
+**Observación:** El sistema de inferencia de schemas automáticamente detecta el campo `stock` agregado por el adapter.
+
+**Resultado:**
+```python
+# Schemas inferidos ahora incluyen 'stock'
+{
+    'Pan': ['nombre', 'tipo', 'tamano', 'unidad', 'stock'],
+    'Salchicha': ['nombre', 'tipo', 'tamano', 'unidad', 'stock'],
+    'Toppings': ['nombre', 'tipo', 'presentacion', 'stock'],
+    # ...
+}
+```
+
+**Ventaja:** No hay código hardcoded del campo `stock`. El sistema se adapta automáticamente (data-driven design).
+
 **Fecha:** NOV 15, 2025
+

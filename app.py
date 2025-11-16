@@ -301,7 +301,8 @@ def setup_cli(handler: DataHandler, entity_classes: dict):
     """
     Sets up the CLI router with all menus.
     
-    This will be implemented once menus are created.
+    Registers all menu definitions and configures the router context
+    with handler and entity classes.
     
     Args:
         handler: Initialized DataHandler
@@ -310,26 +311,50 @@ def setup_cli(handler: DataHandler, entity_classes: dict):
     Returns:
         Configured MenuRouter ready to run
     """
-    # TODO: Implement when menus are ready
+    from cli.core import MenuRouter
+    from cli.menus import create_main_menu, create_not_found_menu
     
-    raise NotImplementedError("CLI menus not implemented yet")
+    print("🎮 Setting up CLI router...")
+    
+    # Create router
+    router = MenuRouter()
+    
+    # Configure context (shared across all actions)
+    router.context['handler'] = handler
+    router.context['entity_classes'] = entity_classes
+    
+    # Register menus
+    router.register_menu(create_main_menu())
+    router.register_menu(create_not_found_menu())  # Fallback for non-existent routes
+    # TODO: Register submenus when they are created
+    # router.register_menu(create_ingredients_menu())
+    # router.register_menu(create_menu_hotdogs_menu())
+    # router.register_menu(create_ventas_menu())
+    # router.register_menu(create_reportes_menu())
+    
+    print("✅ CLI router ready!")
+    
+    return router
 
 
 def run_cli(handler: DataHandler, entity_classes: dict):
     """
     Main CLI entry point.
     
-    This will be implemented once menus are ready.
+    Sets up the router and starts the main navigation loop.
     
     Args:
         handler: Initialized DataHandler
         entity_classes: Dict with all entity classes
     """
-    # TODO: Implement when menus are ready
-    # router = setup_cli(handler, entity_classes)
-    # router.run()
+    # Setup router with all menus
+    router = setup_cli(handler, entity_classes)
     
-    raise NotImplementedError("CLI menus not implemented yet")
+    # Navigate to main menu
+    router.navigate_to('main')
+    
+    # Start main loop
+    router.run()
 
 
 # ──────────────────────────────────────────────────────
@@ -338,21 +363,15 @@ def run_cli(handler: DataHandler, entity_classes: dict):
 
 if __name__ == "__main__":
     """
-    Test the application setup.
+    Test/Debug entry point.
     
-    This is useful for debugging - it initializes everything and shows
-    the status without running the CLI.
+    Runs the full CLI application for testing.
+    Use this to test the application: python app.py
     """
     try:
+        # Initialize and run CLI
         handler, entity_classes = initialize_application(force_external=False)
-        
-        # Show summary
-        print("\n📊 SYSTEM SUMMARY")
-        print("-" * 60)
-        handler.print_summary()
-        
-        print("\n✅ Application initialized successfully!")
-        print("   (CLI menus not implemented yet)")
+        run_cli(handler, entity_classes)
         
     except KeyboardInterrupt:
         print("\n\n⚠️  Interrupted by user")

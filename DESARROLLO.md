@@ -51,11 +51,11 @@ Construir la base del sistema de persistencia y acceso a datos con abstracción 
 Implementar la lógica de orquestación entre colecciones y las validaciones de negocio específicas.
 
 ### Tareas
-- [ ] Servicio de gestión de ingredientes (listar, agregar, eliminar con cascada)
-- [ ] Servicio de gestión de inventario (visualizar, buscar, actualizar)
-- [ ] Servicio de gestión de menú (listar, agregar con validaciones, eliminar)
-- [ ] Servicio de procesamiento de ventas
-- [ ] Utilidades de formateo y validación
+- [x] Servicio de gestión de ingredientes (listar, agregar, eliminar con cascada)
+- [x] Servicio de gestión de inventario (visualizar, buscar, actualizar) (desarrollados como servicios de ingredients)
+- [x] Servicio de gestión de menú (listar, agregar con validaciones, eliminar)
+- [x] Servicio de procesamiento de ventas
+- [x] Utilidades de formateo y validación (absorbido por arquitectura)
 
 ---
 
@@ -1085,4 +1085,183 @@ self.menu = HotDogCollection(data_source)
 - Verificación de persistencia entre instancias
 - Negative testing (errores esperados)
 
+## Notas de Desarrollo - Fase 2
+
+### Sistema de Inventario con Adapter Pattern
+**Decisión:** Implementar el inventario como un campo `stock` en los ingredientes en lugar de crear una colección separada.
+
+**Razones:**
+- El inventario ES parte de los ingredientes (mismo lifecycle, mismo contexto)
+- Evita duplicación y problemas de sincronización
+- Aprovecha la arquitectura data-driven existente (schemas se infieren automáticamente)
+
+**Implementación:** `StockInitializationAdapter` que agrega el campo `stock` a todos los ingredientes al cargar desde GitHub.
+- Se encadena después de `IDAdapter` y `KeyNormalizationAdapter`
+- Permite configurar stock inicial por categoría
+- Consistente con el patrón Adapter ya establecido
+- No modifica los datos de GitHub (solo agrega el campo localmente)
+```python
+# Cadena de adapters completa
+GitHub → IDs → KeyNormalization → StockInitialization → DataSource
+```
+
+### IngredientService: Catálogo + Inventario Unificado
+**Decisión:** Agregar métodos de inventario al `IngredientService` en lugar de crear un `InventoryService` separado.
+
+**Alternativas consideradas:**
+1. ❌ Métodos en la entidad Ingredient (violaría SRP, entidades deben ser DTOs)
+2. ❌ Métodos en IngredientCollection (mezclaría persistencia con lógica de negocio)
+3. ❌ InventoryService separado (dos servicios operando sobre la misma data, overhead innecesario)
+4. ✅ **IngredientService unificado** (catálogo + inventario juntos)
+
+**Razones:**
+- El inventario está intrínsecamente ligado a los ingredientes (mismo archivo, mismo schema)
+- Service layer es el lugar correcto para lógica de negocio
+- Mantiene cohesión: "todo lo relacionado con ingredientes en un solo lugar"
+- Consistente con la arquitectura de servicios estáticos con métodos standalone
+
+**Estructura final:**
+```python
+IngredientService:
+    # Gestión de Catálogo
+    - list_by_category()
+    - list_by_type()
+    - add_ingredient()
+    - delete_ingredient()  # Con validación de uso en menú
+    
+    # Gestión de Inventario
+    - get_full_inventory()
+    - get_stock()
+    - get_inventory_by_category()
+    - update_stock()  # Con validación de stock no negativo
+    - check_hotdog_availability()  # Verifica inventario para hacer un hotdog
+```
+
+### Testing con Persistencia Real
+**Decisión:** Los tests de servicios usan el directorio real `data/` en lugar de directorios temporales.
+
+**Razones:**
+- Permite ver los cambios realmente persistidos en los archivos JSON
+- Facilita debugging (puedes inspeccionar los archivos después de los tests)
+- Reset simple: `git checkout data/` o borrar archivos (se recargan desde GitHub)
+- Más cercano al uso real de la aplicación
+
+**Implementación:**
+- `setup_test_handler()` retorna solo `handler` (no tupla)
+- `teardown_test_handler(handler)` hace `handler.commit()` para persistir cambios
+- Incluye `StockInitializationAdapter` en el setup para que todos los ingredientes tengan stock
+
+### Schema Inference con Campo Stock
+**Observación:** El sistema de inferencia de schemas automáticamente detecta el campo `stock` agregado por el adapter.
+
+**Resultado:**
+```python
+# Schemas inferidos ahora incluyen 'stock'
+{
+    'Pan': ['nombre', 'tipo', 'tamano', 'unidad', 'stock'],
+    'Salchicha': ['nombre', 'tipo', 'tamano', 'unidad', 'stock'],
+    'Toppings': ['nombre', 'tipo', 'presentacion', 'stock'],
+    # ...
+}
+```
+
+**Ventaja:** No hay código hardcoded del campo `stock`. El sistema se adapta automáticamente (data-driven design).
+
 **Fecha:** NOV 15, 2025
+
+## Decisiones de Implementación - Sesión 16 Nov 2025
+
+### MenuService - Implementación Completada
+
+**Decisión: Advertencias vs Errores**
+- Advertencias (no bloquean): tamaños diferentes, stock bajo
+- Errores (bloquean): nombre duplicado, ingredientes inexistentes
+- Razón: Flexibilidad con información al usuario
+
+**Decisión: Patrón de confirmación en delete**
+- Hot dogs CON inventario → requieren confirmación
+- Hot dogs SIN inventario → eliminación directa
+- Implementación: dos pasos (primera llamada advierte, segunda ejecuta)
+
+**Decisión: Referencias estructuradas manuales en add_hotdog**
+- Construcción manual de `{id, nombre}` en lugar de usar `entity.to_dict()`
+- Razón: Control exacto sobre la estructura, evita campos extras
+
+### Bug Fix Crítico
+
+**Problema: check_hotdog_availability() no manejaba referencias estructuradas**
+- Código legacy asumía strings: `hotdog.pan = 'simple'`
+- Realidad post-adapter: `hotdog.pan = {id: '...', nombre: 'simple'}`
+- Solución: Verificar tipo y extraer ID/nombre apropiadamente
+- Priorizar búsqueda por ID (O(1)) sobre nombre (O(n))
+
+**Cambio aplicado a:**
+- pan, salchicha, toppings (lista), salsas (lista), acompanante
+
+### Sistema de Ventas - Órdenes sin Precios
+
+**Decisión: Ventas como órdenes/pedidos (no facturación)**
+- Sin campos de precio en schema de Venta
+- Enfoque en tracking de inventario y estadísticas
+- Requirements no mencionan contabilidad ni facturación
+- Razón: Simplifica modelo, cumple objetivo de "simular ventas"
+
+**Decisión: Items como List[Dict] dentro de Venta**
+- Items NO son entidades separadas, solo dicts
+- Sin VentaItemCollection ni tabla separada
+- Razón: Composición (items solo existen dentro de venta), simplicidad, sin joins
+
+**Decisión: Schema de Venta hardcoded (no inferido)**
+- `venta_schemas.py` define schema explícitamente
+- Sin inferencia desde datos externos
+- Razón: No hay fuente externa (GitHub solo tiene ingredientes/menu), schema fijo por requirements
+
+**Decisión: Fecha con hora completa (ISO DateTime)**
+- Campo `fecha`: `'2024-11-16T14:30:00'` (no solo `'2024-11-16'`)
+- Razón: Permite análisis por franja horaria, orden cronológico preciso
+
+### VentaService - Builder Pattern
+
+**Decisión: Patrón Builder diferido (no método directo)**
+- `VentaBuilder` para construcción paso a paso
+- Alternativa rechazada: `registrar_venta(handler, items=[...])` directo
+- Razón: Flexibilidad para CLI (agregar/quitar items antes de confirmar), preview antes de ejecutar, fácil cancelar
+
+**Decisión: Merge automático de cantidades**
+- `add_item()` del mismo hotdog incrementa cantidad (no duplica items)
+- Razón: UI más limpia, descuento de inventario más simple, no valor en duplicados
+
+**Decisión: Preview separado de confirmación**
+- `preview_draft()` y `confirm_sale()` son métodos distintos
+- Preview sin side effects, confirmación irreversible
+- Razón: Usuario puede revisar múltiples veces antes de confirmar
+
+**Decisión: Commit manual (no automático)**
+- `confirm_sale()` NO hace commit
+- Caller controla cuándo persistir
+- Razón: Transaccionalidad, múltiples operaciones antes de commit, rollback posible
+
+### Descuento de Inventario
+
+**Decisión: Descuento completo de todos los ingredientes**
+- Descuenta pan, salchicha, CADA topping, CADA salsa, acompañante
+- Multiplicado por cantidad vendida
+- Razón: Reflejar consumo real de recursos
+
+**Decisión: Validación en 3 niveles**
+- Level 1 (add_item): Hot dog existe, cantidad > 0
+- Level 2 (preview): Inventario disponible
+- Level 3 (confirm): Re-verificar inventario, validar entidad
+- Razón: Fail fast, diferentes tipos de errores en momentos apropiados
+
+### Utilidades de Formateo y Validación
+
+**Decisión: NO crear módulo utils separado**
+- Validaciones absorbidas por arquitectura existente:
+  - Validaciones de estructura → Plugins (MethodRegistry)
+  - Validaciones de negocio → Services
+  - Validaciones de persistencia → Collections
+  - Formateo → Entity.to_dict(), KeyNormalizationAdapter, id_processors
+- Razón: Separation of concerns, no "cajón de sastre", más mantenible
+
+**Fecha:** NOV 16, 2025

@@ -9,8 +9,10 @@ Date: November 13, 2025
 
 from models.entities.ingredients import create_ingredient_entities
 from models.entities.hotdogs import create_hotdog_entities
+from models.entities.ventas import create_venta_entities
 
 __all__ = [
     'create_ingredient_entities',
-    'create_hotdog_entities'
+    'create_hotdog_entities',
+    'create_venta_entities'
 ]

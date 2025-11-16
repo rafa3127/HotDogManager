@@ -312,7 +312,12 @@ def setup_cli(handler: DataHandler, entity_classes: dict):
         Configured MenuRouter ready to run
     """
     from cli.core import MenuRouter
-    from cli.menus import create_main_menu, create_not_found_menu
+    from cli.menus import (
+        create_main_menu, 
+        create_not_found_menu, 
+        create_ingredients_menu,
+        create_debug_menu
+    )
     
     print("🎮 Setting up CLI router...")
     
@@ -326,8 +331,9 @@ def setup_cli(handler: DataHandler, entity_classes: dict):
     # Register menus
     router.register_menu(create_main_menu())
     router.register_menu(create_not_found_menu())  # Fallback for non-existent routes
-    # TODO: Register submenus when they are created
-    # router.register_menu(create_ingredients_menu())
+    router.register_menu(create_ingredients_menu())  # Ingredients management
+    router.register_menu(create_debug_menu())  # Debug/diagnostics
+    # TODO: Register remaining submenus
     # router.register_menu(create_menu_hotdogs_menu())
     # router.register_menu(create_ventas_menu())
     # router.register_menu(create_reportes_menu())

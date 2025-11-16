@@ -63,6 +63,15 @@ def create_main_menu() -> MenuDefinition:
                 label='📊 Reportes y Estadísticas',
                 navigate_to='reportes'
             ),
+            
+            # ──────────────────────────────────────────────────────
+            # Debug Menu
+            # ──────────────────────────────────────────────────────
+            MenuOption(
+                key='9',
+                label='🔧 Debug / Diagnostics',
+                navigate_to='debug'
+            ),
         ],
         parent_menu=None,  # No parent - this is the root
         auto_add_back=False,  # No back option (root menu)

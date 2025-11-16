@@ -225,7 +225,7 @@ class IngredientService:
             
             return {
                 'exito': True,
-                'ingrediente_eliminado': True,
+                'ingrediente_eliminado': ingrediente,  # Return the entity, not True
                 'hotdogs_afectados': hotdogs_afectados,
                 'hotdogs_eliminados': hotdogs_eliminados,
                 'requiere_confirmacion': False
@@ -257,33 +257,68 @@ class IngredientService:
         hotdogs_usando = []
         
         for hotdog in handler.menu.get_all():
-            # Check if ingredient is used in any field
-            # Hot dogs have: pan, salchicha, toppings, salsas, acompanante
+            # After IngredientReferenceAdapter, references are {id, nombre} dicts
             
-            # Check pan (string field)
-            if hasattr(hotdog, 'pan') and hotdog.pan == ingrediente_nombre:
-                hotdogs_usando.append(hotdog.id)
+            # Check pan
+            if hasattr(hotdog, 'pan') and hotdog.pan:
+                pan_ref = hotdog.pan
+                if isinstance(pan_ref, dict):
+                    if pan_ref.get('id') == ingrediente_id or pan_ref.get('nombre') == ingrediente_nombre:
+                        hotdogs_usando.append(hotdog.id)
+                        continue
+                elif pan_ref == ingrediente_nombre:  # Legacy string format
+                    hotdogs_usando.append(hotdog.id)
+                    continue
+            
+            # Check salchicha
+            if hasattr(hotdog, 'salchicha') and hotdog.salchicha:
+                salchicha_ref = hotdog.salchicha
+                if isinstance(salchicha_ref, dict):
+                    if salchicha_ref.get('id') == ingrediente_id or salchicha_ref.get('nombre') == ingrediente_nombre:
+                        hotdogs_usando.append(hotdog.id)
+                        continue
+                elif salchicha_ref == ingrediente_nombre:
+                    hotdogs_usando.append(hotdog.id)
+                    continue
+            
+            # Check toppings (list of refs)
+            if hasattr(hotdog, 'toppings') and hotdog.toppings:
+                for topping_ref in hotdog.toppings:
+                    if isinstance(topping_ref, dict):
+                        if topping_ref.get('id') == ingrediente_id or topping_ref.get('nombre') == ingrediente_nombre:
+                            hotdogs_usando.append(hotdog.id)
+                            break
+                    elif topping_ref == ingrediente_nombre:
+                        hotdogs_usando.append(hotdog.id)
+                        break
+                else:
+                    continue
                 continue
             
-            # Check salchicha (string field)
-            if hasattr(hotdog, 'salchicha') and hotdog.salchicha == ingrediente_nombre:
-                hotdogs_usando.append(hotdog.id)
+            # Check salsas (list of refs)
+            if hasattr(hotdog, 'salsas') and hotdog.salsas:
+                for salsa_ref in hotdog.salsas:
+                    if isinstance(salsa_ref, dict):
+                        if salsa_ref.get('id') == ingrediente_id or salsa_ref.get('nombre') == ingrediente_nombre:
+                            hotdogs_usando.append(hotdog.id)
+                            break
+                    elif salsa_ref == ingrediente_nombre:
+                        hotdogs_usando.append(hotdog.id)
+                        break
+                else:
+                    continue
                 continue
             
-            # Check toppings (list field)
-            if hasattr(hotdog, 'toppings') and ingrediente_nombre in hotdog.toppings:
-                hotdogs_usando.append(hotdog.id)
-                continue
-            
-            # Check salsas (list field)
-            if hasattr(hotdog, 'salsas') and ingrediente_nombre in hotdog.salsas:
-                hotdogs_usando.append(hotdog.id)
-                continue
-            
-            # Check acompanante (string field, nullable)
-            if hasattr(hotdog, 'acompanante') and hotdog.acompanante == ingrediente_nombre:
-                hotdogs_usando.append(hotdog.id)
-                continue
+            # Check acompanante
+            if hasattr(hotdog, 'acompanante') and hotdog.acompanante:
+                acompanante_ref = hotdog.acompanante
+                if isinstance(acompanante_ref, dict):
+                    if acompanante_ref.get('id') == ingrediente_id or acompanante_ref.get('nombre') == ingrediente_nombre:
+                        hotdogs_usando.append(hotdog.id)
+                        continue
+                elif acompanante_ref == ingrediente_nombre:
+                    hotdogs_usando.append(hotdog.id)
+                    continue
         
         return hotdogs_usando
     

@@ -9,8 +9,12 @@ Date: November 16, 2025
 
 from .main_menu import create_main_menu
 from .not_found_menu import create_not_found_menu
+from .ingredientes_menu import create_ingredients_menu
+from .debug_menu import create_debug_menu
 
 __all__ = [
     'create_main_menu',
     'create_not_found_menu',
+    'create_ingredients_menu',
+    'create_debug_menu',
 ]

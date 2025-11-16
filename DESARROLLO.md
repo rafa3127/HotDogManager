@@ -68,8 +68,8 @@ Construir la interfaz de usuario con un sistema de routing que abstraiga la nave
 - [x] Sistema core de routing (router, rutas, opciones)
 - [x] Tipos de rutas especializadas (estándar, con tablas)
 - [x] Validadores de input de usuario
-- [ ] Implementación de CLI principal
-- [ ] Configuración de todas las rutas del sistema
+- [x] Implementación de CLI principal
+- [x] Configuración de todas las rutas del sistema
 
 ---
 

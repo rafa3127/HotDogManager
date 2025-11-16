@@ -10,5 +10,6 @@ Date: November 15, 2025
 
 from .ingredient_service import IngredientService
 from .menu_service import MenuService
+from .venta_service import VentaService, VentaBuilder
 
-__all__ = ['IngredientService', 'MenuService']
+__all__ = ['IngredientService', 'MenuService', 'VentaService', 'VentaBuilder']

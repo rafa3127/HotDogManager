@@ -15,7 +15,7 @@ Date: November 15, 2025
 """
 
 from typing import Optional, List
-from models.collections import IngredientCollection, HotDogCollection
+from models.collections import IngredientCollection, HotDogCollection, VentaCollection
 from models.core.base_entity import Entity
 
 
@@ -66,11 +66,13 @@ class DataHandler:
         # Initialize collections
         self.ingredientes = IngredientCollection(data_source)
         self.menu = HotDogCollection(data_source)
+        self.ventas = VentaCollection(data_source)
         
         # Track all collections for Unit of Work operations
         self._collections = [
             self.ingredientes,
             self.menu,
+            self.ventas,
         ]
     
     # ────────────────────────────────────────────────────────────

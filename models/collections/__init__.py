@@ -36,9 +36,11 @@ Date: November 15, 2025
 from models.collections.base_collection import BaseCollection
 from models.collections.ingredient_collection import IngredientCollection
 from models.collections.hotdog_collection import HotDogCollection
+from models.collections.venta_collection import VentaCollection
 
 __all__ = [
     'BaseCollection',
     'IngredientCollection',
     'HotDogCollection',
+    'VentaCollection',
 ]

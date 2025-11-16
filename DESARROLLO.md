@@ -54,8 +54,8 @@ Implementar la lógica de orquestación entre colecciones y las validaciones de 
 - [x] Servicio de gestión de ingredientes (listar, agregar, eliminar con cascada)
 - [x] Servicio de gestión de inventario (visualizar, buscar, actualizar) (desarrollados como servicios de ingredients)
 - [x] Servicio de gestión de menú (listar, agregar con validaciones, eliminar)
-- [ ] Servicio de procesamiento de ventas
-- [ ] Utilidades de formateo y validación
+- [x] Servicio de procesamiento de ventas
+- [x] Utilidades de formateo y validación (absorbido por arquitectura)
 
 ---
 
@@ -1197,5 +1197,71 @@ IngredientService:
 
 **Cambio aplicado a:**
 - pan, salchicha, toppings (lista), salsas (lista), acompanante
+
+### Sistema de Ventas - Órdenes sin Precios
+
+**Decisión: Ventas como órdenes/pedidos (no facturación)**
+- Sin campos de precio en schema de Venta
+- Enfoque en tracking de inventario y estadísticas
+- Requirements no mencionan contabilidad ni facturación
+- Razón: Simplifica modelo, cumple objetivo de "simular ventas"
+
+**Decisión: Items como List[Dict] dentro de Venta**
+- Items NO son entidades separadas, solo dicts
+- Sin VentaItemCollection ni tabla separada
+- Razón: Composición (items solo existen dentro de venta), simplicidad, sin joins
+
+**Decisión: Schema de Venta hardcoded (no inferido)**
+- `venta_schemas.py` define schema explícitamente
+- Sin inferencia desde datos externos
+- Razón: No hay fuente externa (GitHub solo tiene ingredientes/menu), schema fijo por requirements
+
+**Decisión: Fecha con hora completa (ISO DateTime)**
+- Campo `fecha`: `'2024-11-16T14:30:00'` (no solo `'2024-11-16'`)
+- Razón: Permite análisis por franja horaria, orden cronológico preciso
+
+### VentaService - Builder Pattern
+
+**Decisión: Patrón Builder diferido (no método directo)**
+- `VentaBuilder` para construcción paso a paso
+- Alternativa rechazada: `registrar_venta(handler, items=[...])` directo
+- Razón: Flexibilidad para CLI (agregar/quitar items antes de confirmar), preview antes de ejecutar, fácil cancelar
+
+**Decisión: Merge automático de cantidades**
+- `add_item()` del mismo hotdog incrementa cantidad (no duplica items)
+- Razón: UI más limpia, descuento de inventario más simple, no valor en duplicados
+
+**Decisión: Preview separado de confirmación**
+- `preview_draft()` y `confirm_sale()` son métodos distintos
+- Preview sin side effects, confirmación irreversible
+- Razón: Usuario puede revisar múltiples veces antes de confirmar
+
+**Decisión: Commit manual (no automático)**
+- `confirm_sale()` NO hace commit
+- Caller controla cuándo persistir
+- Razón: Transaccionalidad, múltiples operaciones antes de commit, rollback posible
+
+### Descuento de Inventario
+
+**Decisión: Descuento completo de todos los ingredientes**
+- Descuenta pan, salchicha, CADA topping, CADA salsa, acompañante
+- Multiplicado por cantidad vendida
+- Razón: Reflejar consumo real de recursos
+
+**Decisión: Validación en 3 niveles**
+- Level 1 (add_item): Hot dog existe, cantidad > 0
+- Level 2 (preview): Inventario disponible
+- Level 3 (confirm): Re-verificar inventario, validar entidad
+- Razón: Fail fast, diferentes tipos de errores en momentos apropiados
+
+### Utilidades de Formateo y Validación
+
+**Decisión: NO crear módulo utils separado**
+- Validaciones absorbidas por arquitectura existente:
+  - Validaciones de estructura → Plugins (MethodRegistry)
+  - Validaciones de negocio → Services
+  - Validaciones de persistencia → Collections
+  - Formateo → Entity.to_dict(), KeyNormalizationAdapter, id_processors
+- Razón: Separation of concerns, no "cajón de sastre", más mantenible
 
 **Fecha:** NOV 16, 2025

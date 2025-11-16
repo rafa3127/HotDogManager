@@ -65,11 +65,11 @@ Implementar la lógica de orquestación entre colecciones y las validaciones de 
 Construir la interfaz de usuario con un sistema de routing que abstraiga la navegación entre menús.
 
 ### Tareas
-- [ ] Sistema core de routing (router, rutas, opciones)
-- [ ] Tipos de rutas especializadas (estándar, con tablas)
-- [ ] Validadores de input de usuario
-- [ ] Implementación de CLI principal
-- [ ] Configuración de todas las rutas del sistema
+- [x] Sistema core de routing (router, rutas, opciones)
+- [x] Tipos de rutas especializadas (estándar, con tablas)
+- [x] Validadores de input de usuario
+- [x] Implementación de CLI principal
+- [x] Configuración de todas las rutas del sistema
 
 ---
 
@@ -1263,5 +1263,134 @@ IngredientService:
   - Validaciones de persistencia → Collections
   - Formateo → Entity.to_dict(), KeyNormalizationAdapter, id_processors
 - Razón: Separation of concerns, no "cajón de sastre", más mantenible
+
+**Fecha:** NOV 16, 2025
+
+## Notas de Desarrollo - Fase 3: CLI Core
+
+### Arquitectura Router Pattern para CLI
+
+**Decisión: Router Pattern similar a frameworks web**
+- Sistema inspirado en Express pero para CLI
+- Menu Definition (declarativo) → Router → Actions → Views
+- Razón: Separación clara de responsabilidades, escalable, reutilizable
+
+**Decisión: Core 100% genérico (portable)**
+- `cli/core/` no tiene conocimiento del dominio de hot dogs
+- Puede extraerse y usarse en cualquier proyecto CLI futuro
+- Razón: Maximizar reutilización, demostrar arquitectura avanzada
+
+**Estructura en capas:**
+```
+Colors → ActionResult → MenuDefinition → Views → Router
+(simple)                                        (complejo)
+```
+
+### Sistema de Colores (colors.py)
+
+**Decisión: ANSI codes en lugar de librería externa**
+- Sin dependencias adicionales (colorama opcional)
+- Métodos semánticos: success(), error(), warning(), info(), header()
+- Razón: Simplicidad, funciona en Mac/Linux, suficiente para el proyecto
+
+### Resultados de Actions (action_result.py)
+
+**Decisión: Factory methods en lugar de constructor directo**
+- `ActionResult.success()`, `.error()`, `.exit()` en vez de `ActionResult(...)`
+- Razón: Más legible, valores por defecto correctos, menos propenso a errores
+
+**Decisión: Comunicación Router ↔ Action vía ActionResult**
+- Action retorna objeto con `navigate_to`, `exit_app`, `message`
+- Router procesa resultado y decide acción
+- Razón: Desacoplamiento, actions no conocen al router directamente
+
+### Definición de Menús (menu_definition.py)
+
+**Decisión: Declarativo sobre imperativo**
+- MenuDefinition con lista de MenuOption
+- Alternativa rechazada: if-elif chains en cada menú
+- Razón: Menos código, más mantenible, estructura clara
+
+**Decisión: MenuOption con action O navigate_to**
+- `action`: ejecuta función
+- `navigate_to`: navega directo
+- `requires_confirm`: confirmación automática
+- Razón: Flexibilidad, casos de uso comunes cubiertos
+
+**Decisión: Validación en __post_init__**
+- Valida al crear el objeto, no al usarlo
+- Verifica: al menos action o navigate_to, no duplicate keys
+- Razón: Fail early, errores se detectan en setup (no en runtime)
+
+### Utilidades de I/O (views.py)
+
+**Decisión: Métodos estáticos (no instanciación)**
+- `Views.prompt()`, `Views.print_header()` como static methods
+- No hace falta `views = Views()` antes de usar
+- Razón: Simplicidad, sin estado, solo utilidades
+
+**Decisión: Validación integrada en prompts**
+- `prompt()`: choices, default
+- `prompt_int()`: min_val, max_val, default
+- `confirm()`: yes/no con default
+- Razón: Validación consistente, DRY, mejor UX
+
+**Decisión: display_table() con auto-cálculo de anchos**
+- Calcula automáticamente ancho de columnas si no se especifica
+- Alternativa rechazada: siempre requerir col_widths
+- Razón: Conveniencia, caso común cubierto automáticamente
+
+### Orquestador Principal (router.py)
+
+**Decisión: Stack de navegación (breadcrumbs)**
+- `navigation_stack` guarda historial de menús visitados
+- `go_back()` usa el stack
+- Razón: Navegación natural, permite volver atrás múltiples niveles
+
+**Decisión: Context compartido entre actions**
+- `router.context` es dict disponible en todas las actions
+- Se pasa como parámetro: `action(context)`
+- Razón: Dependency injection, actions acceden a handler/config sin globals
+
+**Decisión: Validación automática de opciones de menú**
+- Router valida input del usuario contra MenuDefinition
+- Manejo de "back", "exit" automático
+- Razón: Menos código en actions, validación consistente
+
+**Decisión: Confirmación automática (requires_confirm)**
+- Router pregunta confirmación antes de ejecutar action
+- MenuOption solo marca `requires_confirm=True`
+- Razón: Patrón consistente, menos código en actions
+
+**Decisión: Main event loop con try-catch completo**
+- Captura Exception genérico + KeyboardInterrupt
+- Nunca crashea, siempre mensaje amigable
+- Razón: Robustez, mejor UX, debugging más fácil
+
+**Decisión: Auto-add de opciones "Back" y "Exit"**
+- `auto_add_back=True` agrega opción "0" automáticamente
+- `auto_add_exit=True` agrega "exit/quit" automáticamente
+- Razón: Conveniencia, opciones estándar en todos los menús
+
+### Tipos de Navegación
+
+**Decisión: 3 formas de navegar (flexibilidad)**
+1. Direct navigation: `MenuOption(..., navigate_to='menu_id')`
+2. Action retorna navegación: `return ActionResult.success(navigate_to='menu_id')`
+3. Stack navigation: `go_back()`, `go_to_parent()`
+- Razón: Cubrir todos los casos de uso comunes
+
+### Trade-offs
+
+**Ventajas:**
+- ✅ Menos código en total (declarativo)
+- ✅ Consistencia entre todos los menús
+- ✅ Testeable y mantenible
+- ✅ Extensible sin modificar core
+
+**Desventajas:**
+- ❌ Setup inicial más complejo
+- ❌ Curva de aprendizaje para entender el flujo
+- ❌ Overhead para CLIs muy simples (< 3 menús)
 
 **Fecha:** NOV 16, 2025

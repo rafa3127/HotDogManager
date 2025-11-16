@@ -90,8 +90,11 @@ class IngredientCollection(BaseCollection):
             categoria = category_data.get('categoria', '')
             opciones = category_data.get('opciones', [])
             
-            # Capitalize category name to match class name (pan -> Pan)
-            entity_type = categoria.capitalize()
+            # Normalize and capitalize category name to match class name
+            # (acompañante -> acompanante -> Acompanante)
+            from models.schemas.ingredient_schemas import normalize_string
+            categoria_normalizada = normalize_string(categoria)
+            entity_type = categoria_normalizada.capitalize()
             
             # Get the corresponding entity class
             EntityClass = self._entity_classes.get(entity_type)

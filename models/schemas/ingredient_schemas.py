@@ -10,6 +10,49 @@ Date: November 13, 2025
 """
 
 from typing import Dict, List, Any, Optional, Tuple
+import unicodedata
+
+
+def normalize_string(text: str) -> str:
+    """
+    Normalize a string by removing accents and ñ, converting to lowercase.
+    
+    This ensures class names are ASCII-compatible and consistent.
+    
+    Transformations:
+    - 'acompañante' → 'acompanante'
+    - 'Categoría' → 'categoria'
+    - 'TOPPING' → 'topping'
+    
+    Args:
+        text: String to normalize
+    
+    Returns:
+        Normalized string (lowercase, no accents, no ñ)
+    
+    Examples:
+        >>> normalize_string('acompañante')
+        'acompanante'
+        >>> normalize_string('Categoría')
+        'categoria'
+    """
+    if not isinstance(text, str):
+        return text
+    
+    # Replace ñ and Ñ explicitly (not handled by NFD decomposition)
+    normalized = text.replace('ñ', 'n').replace('Ñ', 'n')
+    
+    # Decompose unicode characters (á → a + combining acute accent)
+    normalized = unicodedata.normalize('NFD', normalized)
+    
+    # Remove combining characters (accents)
+    normalized = ''.join(
+        char for char in normalized 
+        if unicodedata.category(char) != 'Mn'
+    )
+    
+    # Convert to lowercase
+    return normalized.lower()
 
 
 def find_common_properties(schemas: Dict[str, List[str]]) -> List[str]:
@@ -59,8 +102,10 @@ def infer_schemas_from_data(raw_data: List[Dict[str, Any]]) -> Tuple[Dict[str, L
         if not categoria:
             continue
         
-        # Capitalize entity_type to follow Python class naming conventions
-        entity_type = categoria.capitalize()
+        # Normalize categoria (remove accents, ñ) then capitalize for class name
+        # 'acompañante' → 'acompanante' → 'Acompanante'
+        categoria_normalizada = normalize_string(categoria)
+        entity_type = categoria_normalizada.capitalize()
         
         if opciones and len(opciones) > 0:
             first_option = opciones[0]
@@ -100,7 +145,7 @@ INGREDIENT_SCHEMAS_FALLBACK = {
     'Toppings': ['tipo', 'presentacion']
 }
 
-INGREDIENT_BASE_PROPERTIES_FALLBACK = ['nombre']
+INGREDIENT_BASE_PROPERTIES_FALLBACK = ['nombre', 'stock']
 
 
 def get_ingredient_schemas(

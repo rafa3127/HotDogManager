@@ -23,6 +23,13 @@ from .menu_actions import (
     action_delete_hotdog,
 )
 
+from .ventas_actions import (
+    action_register_sale,
+    action_view_sales,
+    action_view_sales_by_date,
+    action_sales_statistics,
+)
+
 __all__ = [
     # Ingredientes
     'action_list_by_category',
@@ -37,4 +44,10 @@ __all__ = [
     'action_check_hotdog_availability',
     'action_add_hotdog',
     'action_delete_hotdog',
+    
+    # Ventas
+    'action_register_sale',
+    'action_view_sales',
+    'action_view_sales_by_date',
+    'action_sales_statistics',
 ]

@@ -317,6 +317,7 @@ def setup_cli(handler: DataHandler, entity_classes: dict):
         create_not_found_menu, 
         create_ingredients_menu,
         create_menu_hotdogs_menu,
+        create_ventas_menu,
         create_debug_menu
     )
     
@@ -334,9 +335,9 @@ def setup_cli(handler: DataHandler, entity_classes: dict):
     router.register_menu(create_not_found_menu())  # Fallback for non-existent routes
     router.register_menu(create_ingredients_menu())  # Ingredients management
     router.register_menu(create_menu_hotdogs_menu())  # Menu (Hot Dogs) management
+    router.register_menu(create_ventas_menu())  # Sales management
     router.register_menu(create_debug_menu())  # Debug/diagnostics
     # TODO: Register remaining submenus
-    # router.register_menu(create_ventas_menu())
     # router.register_menu(create_reportes_menu())
     
     print("✅ CLI router ready!")

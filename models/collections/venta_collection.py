@@ -181,7 +181,9 @@ class VentaCollection(BaseCollection):
         total_items = 0
         for venta in self._items.values():
             if hasattr(venta, 'items'):
-                total_items += len(venta.items)
+                # Sum the cantidad of each item
+                for item in venta.items:
+                    total_items += item.get('cantidad', 0)
         
         return {
             'total': total_ventas,

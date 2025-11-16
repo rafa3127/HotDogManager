@@ -17,6 +17,7 @@ from .menu_definition import MenuDefinition, MenuOption
 from .action_result import ActionResult
 from .views import Views
 from .colors import Colors
+import time
 
 
 class MenuRouter:
@@ -95,15 +96,27 @@ class MenuRouter:
         """
         Navigates to a specific menu.
         
+        If menu doesn't exist, navigates to 404 page instead.
+        
         Args:
             menu_id: Menu to navigate to
             add_to_stack: If True, adds current menu to navigation stack
-            
-        Raises:
-            ValueError: If menu_id doesn't exist
         """
+        # If menu doesn't exist, go to 404 page
         if menu_id not in self.menus:
-            raise ValueError(f"Menu '{menu_id}' not found")
+            # Only navigate to 404 if it exists and we're not already there
+            if '404' in self.menus and menu_id != '404':
+                Views.print_warning(f"Menu '{menu_id}' not found. Redirecting to 404 page...")
+                
+                time.sleep(3)
+                # Add current menu to stack before going to 404
+                if add_to_stack and self.current_menu:
+                    self.navigation_stack.append(self.current_menu)
+                self.current_menu = '404'
+                return
+            else:
+                # 404 doesn't exist, raise error (shouldn't happen in production)
+                raise ValueError(f"Menu '{menu_id}' not found and no 404 page available")
         
         # Add current menu to stack (for back navigation)
         if add_to_stack and self.current_menu:

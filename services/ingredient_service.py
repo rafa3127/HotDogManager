@@ -489,12 +489,17 @@ class IngredientService:
             
             # Check pan
             if hasattr(hotdog, 'pan') and hotdog.pan:
-                pan = handler.ingredientes.get_by_name(hotdog.pan, 'Pan')
+                # hotdog.pan es {'id': '...', 'nombre': '...'} después de IngredientReferenceAdapter
+                pan_ref = hotdog.pan
+                pan_id = pan_ref['id'] if isinstance(pan_ref, dict) else None
+                pan_nombre = pan_ref['nombre'] if isinstance(pan_ref, dict) else pan_ref
+                
+                pan = handler.ingredientes.get(pan_id) if pan_id else handler.ingredientes.get_by_name(pan_nombre, 'Pan')
                 if pan:
                     stock = getattr(pan, 'stock', 0)
                     if stock < 1:
                         faltantes.append({
-                            'ingrediente': hotdog.pan,
+                            'ingrediente': pan_nombre,
                             'categoria': 'Pan',
                             'necesita': 1,
                             'disponible': stock
@@ -502,12 +507,16 @@ class IngredientService:
             
             # Check salchicha
             if hasattr(hotdog, 'salchicha') and hotdog.salchicha:
-                salchicha = handler.ingredientes.get_by_name(hotdog.salchicha, 'Salchicha')
+                salchicha_ref = hotdog.salchicha
+                salchicha_id = salchicha_ref['id'] if isinstance(salchicha_ref, dict) else None
+                salchicha_nombre = salchicha_ref['nombre'] if isinstance(salchicha_ref, dict) else salchicha_ref
+                
+                salchicha = handler.ingredientes.get(salchicha_id) if salchicha_id else handler.ingredientes.get_by_name(salchicha_nombre, 'Salchicha')
                 if salchicha:
                     stock = getattr(salchicha, 'stock', 0)
                     if stock < 1:
                         faltantes.append({
-                            'ingrediente': hotdog.salchicha,
+                            'ingrediente': salchicha_nombre,
                             'categoria': 'Salchicha',
                             'necesita': 1,
                             'disponible': stock
@@ -515,13 +524,16 @@ class IngredientService:
             
             # Check toppings
             if hasattr(hotdog, 'toppings') and hotdog.toppings:
-                for topping_name in hotdog.toppings:
-                    topping = handler.ingredientes.get_by_name(topping_name, 'Toppings')
+                for topping_ref in hotdog.toppings:
+                    topping_id = topping_ref['id'] if isinstance(topping_ref, dict) else None
+                    topping_nombre = topping_ref['nombre'] if isinstance(topping_ref, dict) else topping_ref
+                    
+                    topping = handler.ingredientes.get(topping_id) if topping_id else handler.ingredientes.get_by_name(topping_nombre, 'Toppings')
                     if topping:
                         stock = getattr(topping, 'stock', 0)
                         if stock < 1:
                             faltantes.append({
-                                'ingrediente': topping_name,
+                                'ingrediente': topping_nombre,
                                 'categoria': 'Toppings',
                                 'necesita': 1,
                                 'disponible': stock
@@ -529,13 +541,16 @@ class IngredientService:
             
             # Check salsas
             if hasattr(hotdog, 'salsas') and hotdog.salsas:
-                for salsa_name in hotdog.salsas:
-                    salsa = handler.ingredientes.get_by_name(salsa_name, 'Salsa')
+                for salsa_ref in hotdog.salsas:
+                    salsa_id = salsa_ref['id'] if isinstance(salsa_ref, dict) else None
+                    salsa_nombre = salsa_ref['nombre'] if isinstance(salsa_ref, dict) else salsa_ref
+                    
+                    salsa = handler.ingredientes.get(salsa_id) if salsa_id else handler.ingredientes.get_by_name(salsa_nombre, 'Salsa')
                     if salsa:
                         stock = getattr(salsa, 'stock', 0)
                         if stock < 1:
                             faltantes.append({
-                                'ingrediente': salsa_name,
+                                'ingrediente': salsa_nombre,
                                 'categoria': 'Salsa',
                                 'necesita': 1,
                                 'disponible': stock
@@ -543,12 +558,16 @@ class IngredientService:
             
             # Check acompanante
             if hasattr(hotdog, 'acompanante') and hotdog.acompanante:
-                acompanante = handler.ingredientes.get_by_name(hotdog.acompanante, 'Acompañante')
+                acompanante_ref = hotdog.acompanante
+                acompanante_id = acompanante_ref['id'] if isinstance(acompanante_ref, dict) else None
+                acompanante_nombre = acompanante_ref['nombre'] if isinstance(acompanante_ref, dict) else acompanante_ref
+                
+                acompanante = handler.ingredientes.get(acompanante_id) if acompanante_id else handler.ingredientes.get_by_name(acompanante_nombre, 'Acompañante')
                 if acompanante:
                     stock = getattr(acompanante, 'stock', 0)
                     if stock < 1:
                         faltantes.append({
-                            'ingrediente': hotdog.acompanante,
+                            'ingrediente': acompanante_nombre,
                             'categoria': 'Acompañante',
                             'necesita': 1,
                             'disponible': stock

@@ -9,5 +9,6 @@ Date: November 15, 2025
 """
 
 from .ingredient_service import IngredientService
+from .menu_service import MenuService
 
-__all__ = ['IngredientService']
+__all__ = ['IngredientService', 'MenuService']

@@ -53,7 +53,7 @@ Implementar la lógica de orquestación entre colecciones y las validaciones de 
 ### Tareas
 - [x] Servicio de gestión de ingredientes (listar, agregar, eliminar con cascada)
 - [x] Servicio de gestión de inventario (visualizar, buscar, actualizar) (desarrollados como servicios de ingredients)
-- [ ] Servicio de gestión de menú (listar, agregar con validaciones, eliminar)
+- [x] Servicio de gestión de menú (listar, agregar con validaciones, eliminar)
 - [ ] Servicio de procesamiento de ventas
 - [ ] Utilidades de formateo y validación
 
@@ -1169,3 +1169,33 @@ IngredientService:
 
 **Fecha:** NOV 15, 2025
 
+## Decisiones de Implementación - Sesión 16 Nov 2025
+
+### MenuService - Implementación Completada
+
+**Decisión: Advertencias vs Errores**
+- Advertencias (no bloquean): tamaños diferentes, stock bajo
+- Errores (bloquean): nombre duplicado, ingredientes inexistentes
+- Razón: Flexibilidad con información al usuario
+
+**Decisión: Patrón de confirmación en delete**
+- Hot dogs CON inventario → requieren confirmación
+- Hot dogs SIN inventario → eliminación directa
+- Implementación: dos pasos (primera llamada advierte, segunda ejecuta)
+
+**Decisión: Referencias estructuradas manuales en add_hotdog**
+- Construcción manual de `{id, nombre}` en lugar de usar `entity.to_dict()`
+- Razón: Control exacto sobre la estructura, evita campos extras
+
+### Bug Fix Crítico
+
+**Problema: check_hotdog_availability() no manejaba referencias estructuradas**
+- Código legacy asumía strings: `hotdog.pan = 'simple'`
+- Realidad post-adapter: `hotdog.pan = {id: '...', nombre: 'simple'}`
+- Solución: Verificar tipo y extraer ID/nombre apropiadamente
+- Priorizar búsqueda por ID (O(1)) sobre nombre (O(n))
+
+**Cambio aplicado a:**
+- pan, salchicha, toppings (lista), salsas (lista), acompanante
+
+**Fecha:** NOV 16, 2025

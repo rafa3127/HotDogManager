@@ -19,6 +19,12 @@ El sistema carga datos iniciales desde GitHub y persiste cambios localmente, per
 
 - **Rafael Correa**
 
+## 🔗 Repositorio
+
+- **GitHub**: [https://github.com/rafa3127/HotDogManager](https://github.com/rafa3127/HotDogManager)
+
+> **Nota**: Este proyecto se entrega en formato ZIP. El repositorio de GitHub contiene el código fuente completo con historial de commits y documentación adicional.
+
 ## 🎓 Información Académica
 
 - **Institución**: Universidad Metropolitana

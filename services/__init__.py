@@ -11,5 +11,14 @@ Date: November 15, 2025
 from .ingredient_service import IngredientService
 from .menu_service import MenuService
 from .venta_service import VentaService, VentaBuilder
+from .reporting_service import ReportingService
+from .chart_generator import ChartGenerator
 
-__all__ = ['IngredientService', 'MenuService', 'VentaService', 'VentaBuilder']
+__all__ = [
+    'IngredientService', 
+    'MenuService', 
+    'VentaService', 
+    'VentaBuilder', 
+    'ReportingService',
+    'ChartGenerator'
+]

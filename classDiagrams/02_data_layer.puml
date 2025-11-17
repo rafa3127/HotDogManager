@@ -1,0 +1,134 @@
+@startuml Data Layer
+title Hot Dog CCS - Data Layer (Adapters & Collections)
+
+' External Sources
+abstract class ExternalSourceClient {
+    + {abstract} fetch_data(identifier, **kwargs): Any
+}
+
+class GitHubClient {
+    - owner: str
+    - repo: str
+    - branch: str
+    + fetch_data(identifier, **kwargs): dict
+}
+
+' Adapters
+class IDAdapter {
+    - external_source: ExternalSourceClient
+    - id_processor: Callable
+    + fetch_data(identifier, **kwargs): dict
+}
+
+class KeyNormalizationAdapter {
+    - external_source: ExternalSourceClient
+    + fetch_data(identifier, **kwargs): dict
+}
+
+class StockInitializationAdapter {
+    - external_source: ExternalSourceClient
+    - default_stock: int
+    - stock_by_category: dict
+    + fetch_data(identifier, **kwargs): dict
+}
+
+class IngredientReferenceAdapter {
+    - external_source: ExternalSourceClient
+    - ingredientes_source: ExternalSourceClient
+    + fetch_data(identifier, **kwargs): dict
+}
+
+' Data Source
+class DataSourceClient {
+    - data_dir: str
+    - _data_store: dict
+    + initialize(sources: dict, force_external: bool)
+    + get(name: str): Any
+    + save(name: str, data: Any)
+}
+
+' Collections
+abstract class BaseCollection {
+    # _data_source: DataSourceClient
+    # _items: Dict[str, Entity]
+    # _dirty: bool
+    + get(id: str): Optional[Entity]
+    + get_all(): List[Entity]
+    + add(entity: Entity)
+    + update(entity: Entity)
+    + delete(id: str)
+    + flush()
+    + reload()
+    # {abstract} _load()
+    # {abstract} _prepare_for_save()
+}
+
+class IngredientCollection {
+    + get_by_category(categoria: str): List[Entity]
+    + get_by_name(nombre: str, categoria: str): Optional[Entity]
+    + get_categories(): List[str]
+}
+
+class HotDogCollection {
+    + get_by_name(nombre: str): Optional[Entity]
+    + get_with_topping(topping: str): List[Entity]
+}
+
+class VentaCollection {
+    + get_by_date(fecha: str): List[Entity]
+    + get_by_hotdog(hotdog_id: str): List[Entity]
+}
+
+' DataHandler
+class DataHandler {
+    + ingredientes: IngredientCollection
+    + menu: HotDogCollection
+    + ventas: VentaCollection
+    + commit()
+    + rollback()
+    + has_changes: bool
+}
+
+' Relationships
+GitHubClient --|> ExternalSourceClient
+IDAdapter --|> ExternalSourceClient
+KeyNormalizationAdapter --|> ExternalSourceClient
+StockInitializationAdapter --|> ExternalSourceClient
+IngredientReferenceAdapter --|> ExternalSourceClient
+
+IDAdapter o-- ExternalSourceClient : wraps
+KeyNormalizationAdapter o-- ExternalSourceClient : wraps
+StockInitializationAdapter o-- ExternalSourceClient : wraps
+IngredientReferenceAdapter o-- ExternalSourceClient : wraps
+
+DataSourceClient o-- ExternalSourceClient : uses
+
+IngredientCollection --|> BaseCollection
+HotDogCollection --|> BaseCollection
+VentaCollection --|> BaseCollection
+
+BaseCollection --> DataSourceClient : uses
+
+DataHandler *-- IngredientCollection
+DataHandler *-- HotDogCollection
+DataHandler *-- VentaCollection
+
+note right of IDAdapter
+  Adds deterministic IDs
+  using MD5 hashing
+end note
+
+note right of KeyNormalizationAdapter
+  Normalizes keys:
+  - Lowercase
+  - No accents
+  - No ñ
+end note
+
+note right of DataHandler
+  Unit of Work Pattern
+  Coordinates all collections
+  Single commit/rollback
+end note
+
+@enduml

@@ -1,0 +1,110 @@
+@startuml Model Core - Metaprogramming
+title Hot Dog CCS - Model Core (Metaprogramming System)
+
+' Base Entity
+class Entity {
+    + id: str
+    + entity_type: str
+    + __init__(id, entity_type, **kwargs)
+    + to_dict(): dict
+    + from_dict(data): Entity {static}
+    + validate(): bool
+    + __eq__(other): bool
+    + __hash__(): int
+}
+
+' Method Registry (Singleton-like)
+class MethodRegistry <<singleton>> {
+    - {static} _methods: Dict[str, Dict[str, Callable]]
+    - {static} _validators: Dict[str, List[Callable]]
+    + {static} register_method(entity_type, name, method)
+    + {static} register_validator(entity_type, validator)
+    + {static} get_methods(entity_type): Dict
+    + {static} get_validator(entity_type): Callable
+    + {static} has_validator(entity_type): bool
+}
+
+' Entity Factory
+class EntityFactory {
+    + {static} create_entity_class(class_name, entity_type, properties, base_class): Type
+    + {static} create_base_class(class_name, common_properties, base_class): Type
+    + {static} create_entities_from_schemas(schemas, base_class): Dict[str, Type]
+}
+
+' Schema Inference
+class SchemaInference {
+    + {static} infer_schemas_from_data(raw_data): Tuple[Dict, List]
+    + {static} infer_hotdog_schema(raw_data): Dict
+    + {static} infer_venta_schema(): Dict
+}
+
+' Plugins (examples)
+class IngredientBasePlugin <<plugin>> {
+    + validate_ingredient_nombre(self): bool
+}
+
+class PanPlugin <<plugin>> {
+    + validate_pan_tamaño(self): bool
+    + validate_pan_unidad(self): bool
+}
+
+class SalchichaPlugin <<plugin>> {
+    + matches_size(self, other): bool
+    + validate_salchicha_tamaño(self): bool
+}
+
+class HotDogPlugin <<plugin>> {
+    + has_toppings(self): bool
+    + has_salsas(self): bool
+    + is_combo(self): bool
+}
+
+' Entity Creators
+class EntityCreators {
+    + {static} create_ingredient_entities(raw_data): Dict[str, Type]
+    + {static} create_hotdog_entities(raw_data): Dict[str, Type]
+    + {static} create_venta_entities(): Dict[str, Type]
+}
+
+' Relationships
+IngredientBasePlugin ..> MethodRegistry : registers
+PanPlugin ..> MethodRegistry : registers
+SalchichaPlugin ..> MethodRegistry : registers
+HotDogPlugin ..> MethodRegistry : registers
+
+EntityFactory ..> MethodRegistry : consumes
+EntityFactory ..> Entity : creates subclasses
+
+SchemaInference ..> EntityCreators : used by
+
+EntityCreators ..> EntityFactory : uses
+EntityCreators ..> SchemaInference : uses
+
+note right of MethodRegistry
+  Plugins register methods
+  and validators at import time
+  (side effect)
+end note
+
+note right of EntityFactory
+  Uses make_dataclass()
+  to generate classes dynamically
+  in runtime
+end note
+
+note right of SchemaInference
+  Infers schemas from actual data
+  (data-driven approach)
+  Falls back to hardcoded if needed
+end note
+
+note bottom of EntityCreators
+  Orchestrates:
+  1. Import plugins (side effect)
+  2. Infer schemas
+  3. Create base class (if needed)
+  4. Generate specific classes
+  5. Inject methods/validators
+end note
+
+@enduml

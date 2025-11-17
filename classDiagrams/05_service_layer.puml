@@ -1,0 +1,173 @@
+@startuml Service Layer
+!define LIGHTORANGE #FFE6CC
+!define LIGHTBLUE #CCE5FF
+!define LIGHTGREEN #D5F4E6
+!define LIGHTYELLOW #FFF4CC
+
+' ═══════════════════════════════════════════════════════════
+'  SERVICE LAYER - Business Logic Services
+' ═══════════════════════════════════════════════════════════
+
+' ─── Package: Services ───
+package "services" <<Frame>> {
+    
+    ' ─── Ingredient Management ───
+    class IngredientService <<static>> LIGHTORANGE {
+        {static} + list_by_category(handler, categoria): List[Entity]
+        {static} + list_by_type(handler, categoria, tipo): List[Entity]
+        {static} + add_ingredient(handler, categoria, nombre, **kwargs): Dict
+        {static} + delete_ingredient(handler, ingrediente_id, confirmar): Dict
+        --
+        {static} + get_full_inventory(handler): Dict[str, int]
+        {static} + get_stock(handler, ingrediente_id): int
+        {static} + get_inventory_by_category(handler, categoria): Dict
+        {static} + update_stock(handler, ingrediente_id, cantidad): Dict
+        {static} + check_hotdog_availability(handler, hotdog_id): Dict
+        --
+        {static} - _find_hotdogs_using_ingredient(handler, id, nombre): List
+    }
+    
+    ' ─── Menu Management ───
+    class MenuService <<static>> LIGHTORANGE {
+        {static} + list_all(handler): List[HotDog]
+        {static} + get_by_name(handler, nombre): HotDog
+        {static} + get_combos(handler): List[HotDog]
+        {static} + get_simple_hotdogs(handler): List[HotDog]
+        {static} + check_availability(handler, hotdog_id): Dict
+        --
+        {static} + add_hotdog(handler, nombre, pan_id, salchicha_id, ...): Dict
+        {static} + delete_hotdog(handler, hotdog_id, confirmar): Dict
+        --
+        {static} + get_stats(handler): Dict
+    }
+    
+    ' ─── Sales Management ───
+    class VentaService <<static>> LIGHTORANGE {
+        {static} + create_draft(): VentaBuilder
+        {static} + add_item(handler, builder, hotdog_id, cantidad): Dict
+        {static} + remove_item(builder, hotdog_id): Dict
+        {static} + update_quantity(builder, hotdog_id, cantidad): Dict
+        {static} + clear_draft(builder): Dict
+        {static} + preview_draft(handler, builder): Dict
+        {static} + confirm_sale(handler, builder, fecha): Dict
+    }
+    
+    ' ─── Builder Pattern for Sales ───
+    class VentaBuilder LIGHTBLUE {
+        - items: List[Dict]
+        - fecha: str
+        - id: str
+        --
+        + add_item(hotdog_id, hotdog_nombre, cantidad): void
+        + remove_item(hotdog_id): bool
+        + update_cantidad(hotdog_id, cantidad): bool
+        + clear(): void
+        + get_total_items(): int
+    }
+    
+    ' ─── Reporting & Analytics ───
+    class ReportingService <<static>> LIGHTGREEN {
+        {static} + get_sales_by_date(handler): Dict[str, int]
+        {static} + get_hotdogs_sold_by_date(handler): Dict[str, int]
+        {static} + get_sales_by_hour(handler): Dict[int, int]
+        {static} + get_sales_by_time_range(handler, start, end): int
+        --
+        {static} + get_top_hotdogs(handler, limit): List[Tuple]
+        {static} + get_ingredient_consumption(handler): Dict[str, int]
+        --
+        {static} + compare_dates(handler, dates): Dict
+        {static} + get_general_stats(handler): Dict
+        {static} + get_date_range(handler): Tuple[str, str]
+    }
+    
+    ' ─── Chart Generation ───
+    class ChartGenerator <<static>> LIGHTGREEN {
+        {static} - STYLE: str
+        {static} - FIGSIZE: Tuple
+        {static} - DPI: int
+        --
+        {static} + sales_over_time(data, output, title): str
+        {static} + hotdogs_over_time(data, output, title): str
+        {static} + top_hotdogs(data, output, title): str
+        {static} + ingredient_consumption(data, output, title, top_n): str
+        {static} + sales_by_hour(data, output, title): str
+        {static} + compare_dates(data, output, title): str
+        --
+        {static} - _setup_style(): void
+    }
+}
+
+' ─── External Dependencies ───
+package "handlers" <<Frame>> {
+    class DataHandler LIGHTYELLOW {
+        + ingredientes: IngredientCollection
+        + menu: HotDogCollection
+        + ventas: VentaCollection
+        --
+        + commit(): void
+        + rollback(): void
+        + has_changes: bool
+    }
+}
+
+' ═══════════════════════════════════════════════════════════
+'  RELATIONSHIPS
+' ═══════════════════════════════════════════════════════════
+
+' ─── Services use DataHandler ───
+IngredientService ..> DataHandler : << uses >>
+MenuService ..> DataHandler : << uses >>
+VentaService ..> DataHandler : << uses >>
+ReportingService ..> DataHandler : << uses >>
+
+' ─── VentaService creates VentaBuilder ───
+VentaService ..> VentaBuilder : << creates >>
+
+' ─── ReportingService uses ChartGenerator ───
+ReportingService ..> ChartGenerator : << uses >>
+
+' ─── MenuService uses IngredientService ───
+MenuService ..> IngredientService : << uses >>\ncheck_hotdog_availability()
+
+' ─── VentaService uses IngredientService ───
+VentaService ..> IngredientService : << uses >>\nupdate_stock()
+
+' ═══════════════════════════════════════════════════════════
+'  NOTES
+' ═══════════════════════════════════════════════════════════
+
+note right of IngredientService
+  **Service Layer Pattern**
+  
+  All services are stateless with
+  static methods. They receive
+  DataHandler as parameter.
+  
+  Business logic is isolated from
+  persistence and presentation.
+end note
+
+note right of VentaBuilder
+  **Builder Pattern**
+  
+  Allows step-by-step construction
+  of sales (Venta) before confirming.
+  
+  Supports:
+  • Add/remove items
+  • Quantity updates
+  • Preview before commit
+  • Deferred execution
+end note
+
+note bottom of ReportingService
+  **Separation of Concerns**
+  
+  ReportingService: Data aggregation & analysis
+  ChartGenerator: Visualization with matplotlib
+  
+  Service can be used for text reports,
+  charts are optional.
+end note
+
+@enduml

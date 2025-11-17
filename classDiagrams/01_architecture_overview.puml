@@ -1,0 +1,77 @@
+@startuml Architecture Overview
+!define RECTANGLE class
+
+title Hot Dog CCS - Architecture Overview
+
+package "CLI Layer" {
+    [MenuRouter] as Router
+    [Views] as Views
+    [Actions] as Actions
+}
+
+package "Service Layer" {
+    [IngredientService] as IngredService
+    [MenuService] as MenuService
+    [VentaService] as VentaService
+    [ReportingService] as ReportService
+}
+
+package "Data Layer" {
+    [DataHandler] as Handler
+    [Collections] as Collections
+    [DataSourceClient] as DataSource
+}
+
+package "Model Layer" {
+    [EntityFactory] as Factory
+    [MethodRegistry] as Registry
+    [Entity Classes] as Entities
+}
+
+package "Clients Layer" {
+    [GitHubClient] as GitHub
+    [Adapters Chain] as Adapters
+}
+
+' Dependencies (top to bottom)
+Router --> Actions
+Actions --> IngredService
+Actions --> MenuService
+Actions --> VentaService
+Actions --> ReportService
+
+IngredService --> Handler
+MenuService --> Handler
+VentaService --> Handler
+ReportService --> Handler
+
+Handler --> Collections
+Collections --> DataSource
+
+Factory --> Entities
+Collections --> Entities
+
+DataSource --> Adapters
+Adapters --> GitHub
+
+note right of Router
+  Router Pattern
+  Declarative UI
+end note
+
+note right of Handler
+  Unit of Work Pattern
+  Coordinates all collections
+end note
+
+note right of Factory
+  Metaprogramming
+  Dynamic class generation
+end note
+
+note right of Adapters
+  Chain of Responsibility
+  Data transformation pipeline
+end note
+
+@enduml

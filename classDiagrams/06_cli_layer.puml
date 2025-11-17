@@ -1,0 +1,269 @@
+@startuml CLI Layer
+!define LIGHTPURPLE #E6D5F5
+!define LIGHTBLUE #CCE5FF
+!define LIGHTGREEN #D5F4E6
+!define LIGHTORANGE #FFE6CC
+!define LIGHTYELLOW #FFF4CC
+
+' ═══════════════════════════════════════════════════════════
+'  CLI LAYER - Router Pattern & Declarative UI
+' ═══════════════════════════════════════════════════════════
+
+' ─── Package: CLI Core (Generic & Reusable) ───
+package "cli.core" <<Frame>> {
+    
+    ' ─── Router (Orchestrator) ───
+    class MenuRouter LIGHTPURPLE {
+        - menus: Dict[str, MenuDefinition]
+        - current_menu: str
+        - navigation_stack: List[str]
+        - context: dict
+        - running: bool
+        --
+        + register_menu(menu: MenuDefinition): void
+        + navigate_to(menu_id: str): void
+        + go_back(): void
+        + go_to_parent(): void
+        + run(): void
+        --
+        - _display_menu(): void
+        - _get_user_choice(): str
+        - _execute_option(option: MenuOption): void
+        - _handle_action_result(result: ActionResult): void
+    }
+    
+    ' ─── Menu Definition (Declarative) ───
+    class MenuDefinition LIGHTBLUE {
+        + id: str
+        + title: str
+        + description: str
+        + options: List[MenuOption]
+        + parent_menu: str
+        + auto_add_back: bool
+        + auto_add_exit: bool
+        + clear_screen: bool
+    }
+    
+    ' ─── Menu Option ───
+    class MenuOption LIGHTBLUE {
+        + key: str
+        + label: str
+        + action: Callable
+        + navigate_to: str
+        + requires_confirm: bool
+    }
+    
+    ' ─── Action Result (Communication) ───
+    class ActionResult LIGHTGREEN {
+        + success: bool
+        + message: str
+        + navigate_to: str
+        + exit_app: bool
+        + data: dict
+        --
+        {static} + success(message, navigate_to): ActionResult
+        {static} + error(message): ActionResult
+        {static} + exit(): ActionResult
+    }
+    
+    ' ─── Views (I/O Utilities) ───
+    class Views <<utility>> LIGHTYELLOW {
+        {static} + clear_screen(): void
+        {static} + print_header(title, subtitle): void
+        {static} + print_separator(width, char): void
+        --
+        {static} + print_success(message): void
+        {static} + print_error(message): void
+        {static} + print_warning(message): void
+        {static} + print_info(message): void
+        --
+        {static} + prompt(message, choices, default): str
+        {static} + prompt_int(message, min_val, max_val): int
+        {static} + confirm(message, default): bool
+        --
+        {static} + display_table(headers, rows, col_widths): void
+        {static} + pause(message): void
+    }
+    
+    ' ─── Colors (ANSI Codes) ───
+    class Colors <<utility>> LIGHTYELLOW {
+        {static} + RED: str
+        {static} + GREEN: str
+        {static} + YELLOW: str
+        {static} + BLUE: str
+        {static} + MAGENTA: str
+        {static} + CYAN: str
+        {static} + RESET: str
+        --
+        {static} + red(text): str
+        {static} + green(text): str
+        {static} + yellow(text): str
+        {static} + blue(text): str
+        {static} + bold(text): str
+        --
+        {static} + success(text): str
+        {static} + error(text): str
+        {static} + warning(text): str
+        {static} + info(text): str
+    }
+}
+
+' ─── Package: Concrete Menus (Domain Specific) ───
+package "cli.menus" <<Frame>> {
+    
+    class MainMenu <<example>> LIGHTORANGE {
+        {static} + create_main_menu(): MenuDefinition
+    }
+    
+    class IngredientesMenu <<example>> LIGHTORANGE {
+        {static} + create_ingredientes_menu(): MenuDefinition
+    }
+    
+    class MenuHotdogsMenu <<example>> LIGHTORANGE {
+        {static} + create_menu_hotdogs_menu(): MenuDefinition
+    }
+    
+    class VentasMenu <<example>> LIGHTORANGE {
+        {static} + create_ventas_menu(): MenuDefinition
+    }
+    
+    class ReportesMenu <<example>> LIGHTORANGE {
+        {static} + create_reportes_menu(): MenuDefinition
+    }
+}
+
+' ─── Package: Actions (Business Logic Execution) ───
+package "cli.actions" <<Frame>> {
+    
+    class IngredientesActions <<module>> LIGHTORANGE {
+        {static} + action_list_by_category(context): ActionResult
+        {static} + action_list_by_type(context): ActionResult
+        {static} + action_view_inventory(context): ActionResult
+        {static} + action_update_stock(context): ActionResult
+        {static} + action_add_ingredient(context): ActionResult
+        {static} + action_delete_ingredient(context): ActionResult
+    }
+    
+    class MenuActions <<module>> LIGHTORANGE {
+        {static} + action_list_hotdogs(context): ActionResult
+        {static} + action_check_availability(context): ActionResult
+        {static} + action_add_hotdog(context): ActionResult
+        {static} + action_delete_hotdog(context): ActionResult
+    }
+    
+    class VentasActions <<module>> LIGHTORANGE {
+        {static} + action_register_sale(context): ActionResult
+        {static} + action_view_all_sales(context): ActionResult
+        {static} + action_view_sales_by_date(context): ActionResult
+        {static} + action_sales_stats(context): ActionResult
+        {static} + action_simulate_day(context): ActionResult
+    }
+    
+    class ReportingActions <<module>> LIGHTORANGE {
+        {static} + action_generate_all_charts(context): ActionResult
+        {static} + action_sales_over_time_chart(context): ActionResult
+        {static} + action_top_hotdogs_chart(context): ActionResult
+        {static} + action_sales_by_hour_chart(context): ActionResult
+        {static} + action_compare_dates_chart(context): ActionResult
+        {static} + action_general_report(context): ActionResult
+    }
+}
+
+' ═══════════════════════════════════════════════════════════
+'  RELATIONSHIPS
+' ═══════════════════════════════════════════════════════════
+
+' ─── Core Relationships ───
+MenuRouter "1" *-- "many" MenuDefinition : manages >
+MenuDefinition "1" *-- "many" MenuOption : contains >
+MenuOption ..> ActionResult : returns >
+
+' ─── Router uses utilities ───
+MenuRouter ..> Views : << uses >>
+MenuRouter ..> Colors : << uses >>
+
+' ─── Concrete menus create MenuDefinitions ───
+MainMenu ..> MenuDefinition : << creates >>
+IngredientesMenu ..> MenuDefinition : << creates >>
+MenuHotdogsMenu ..> MenuDefinition : << creates >>
+VentasMenu ..> MenuDefinition : << creates >>
+ReportesMenu ..> MenuDefinition : << creates >>
+
+' ─── MenuOptions reference actions ───
+MenuOption ..> IngredientesActions : calls >
+MenuOption ..> MenuActions : calls >
+MenuOption ..> VentasActions : calls >
+MenuOption ..> ReportingActions : calls >
+
+' ─── Actions use utilities ───
+IngredientesActions ..> Views : << uses >>
+MenuActions ..> Views : << uses >>
+VentasActions ..> Views : << uses >>
+ReportingActions ..> Views : << uses >>
+
+IngredientesActions ..> Colors : << uses >>
+MenuActions ..> Colors : << uses >>
+VentasActions ..> Colors : << uses >>
+ReportingActions ..> Colors : << uses >>
+
+' ═══════════════════════════════════════════════════════════
+'  NOTES
+' ═══════════════════════════════════════════════════════════
+
+note right of MenuRouter
+  **Router Pattern**
+  
+  Similar to web frameworks (Flask, Express)
+  but for CLI applications.
+  
+  • Manages navigation stack
+  • Executes actions
+  • Handles results
+  • Maintains context
+end note
+
+note right of MenuDefinition
+  **Declarative UI**
+  
+  Menus defined as data structures,
+  not imperative code.
+  
+  Auto-adds "Back" and "Exit" options
+  based on configuration.
+end note
+
+note bottom of ActionResult
+  **Factory Methods**
+  
+  Provides semantic constructors:
+  • ActionResult.success()
+  • ActionResult.error()
+  • ActionResult.exit()
+  
+  Communicates navigation intent
+  from actions to router.
+end note
+
+note left of Views
+  **Utilities**
+  
+  Consistent I/O operations:
+  • Headers & separators
+  • Colored messages
+  • Input validation
+  • Tables & pauses
+end note
+
+note top of IngredientesActions
+  **Separation of Concerns**
+  
+  Actions orchestrate:
+  1. User input (Views)
+  2. Business logic (Services)
+  3. Output formatting (Views)
+  4. Navigation (ActionResult)
+  
+  No business logic in actions.
+end note
+
+@enduml

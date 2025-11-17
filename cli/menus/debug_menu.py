@@ -8,6 +8,8 @@ Date: November 16, 2025
 """
 
 from cli.core import MenuDefinition, MenuOption, ActionResult, Views, Colors
+import os
+import shutil
 
 
 def action_show_entity_classes(context: dict) -> ActionResult:
@@ -123,6 +125,94 @@ def action_compare_classes_vs_categories(context: dict) -> ActionResult:
     return ActionResult.success()
 
 
+def action_reset_data(context: dict) -> ActionResult:
+    """
+    Reset all local data to initial state (reload from GitHub).
+    
+    This will:
+    - Delete all local data files (ingredientes.json, menu.json, ventas.json)
+    - Delete all generated charts
+    - Force application restart
+    
+    Args:
+        context: Router context
+        
+    Returns:
+        ActionResult with exit_app=True
+    """
+    Views.clear_screen()
+    Views.print_header("RESET DE DATOS")
+    
+    print(f"\n{Colors.yellow(Colors.bold('⚠️  ADVERTENCIA'))}")
+    print("\nEsta acción eliminará:")
+    print(f"  {Colors.red('•')} Todos los datos locales (data/)")
+    print(f"  {Colors.red('•')} Todos los gráficos generados (charts/)")
+    print(f"  {Colors.red('•')} Todas las ventas registradas")
+    print(f"  {Colors.red('•')} Todos los cambios de inventario")
+    print(f"  {Colors.red('•')} Todos los hot dogs agregados al menú")
+    print("\nLos datos se recargarán desde GitHub al reiniciar.")
+    
+    print(f"\n{Colors.bold('Esta acción NO se puede deshacer.')}")
+    
+    if not Views.confirm("\n¿Estás seguro de que quieres resetear todos los datos?", default=False):
+        Views.print_info("Operación cancelada.")
+        Views.pause()
+        return ActionResult.success()
+    
+    # Double confirmation
+    if not Views.confirm("\n¿Estás REALMENTE seguro? Esta es tu última oportunidad.", default=False):
+        Views.print_info("Operación cancelada.")
+        Views.pause()
+        return ActionResult.success()
+    
+    print(f"\n{Colors.bold('Reseteando datos...')}")
+    
+    deleted_files = []
+    deleted_dirs = []
+    errors = []
+    
+    # Delete data/ directory
+    try:
+        if os.path.exists('data'):
+            shutil.rmtree('data')
+            deleted_dirs.append('data/')
+            print(f"  {Colors.green('✓')} Directorio data/ eliminado")
+        else:
+            print(f"  {Colors.yellow('ℹ')} Directorio data/ no existe")
+    except Exception as e:
+        errors.append(f"Error eliminando data/: {e}")
+        print(f"  {Colors.red('✗')} Error eliminando data/: {e}")
+    
+    # Delete charts/ directory
+    try:
+        if os.path.exists('charts'):
+            shutil.rmtree('charts')
+            deleted_dirs.append('charts/')
+            print(f"  {Colors.green('✓')} Directorio charts/ eliminado")
+        else:
+            print(f"  {Colors.yellow('ℹ')} Directorio charts/ no existe")
+    except Exception as e:
+        errors.append(f"Error eliminando charts/: {e}")
+        print(f"  {Colors.red('✗')} Error eliminando charts/: {e}")
+    
+    print()
+    
+    if errors:
+        Views.print_error(f"Se encontraron {len(errors)} errores durante el reset.")
+        for error in errors:
+            print(f"  • {error}")
+    else:
+        Views.print_success("✅ Datos reseteados exitosamente!")
+    
+    print(f"\n{Colors.bold(Colors.blue('La aplicación se cerrará.'))}")
+    print(f"{Colors.info('Ejecuta python main.py para reiniciar con datos frescos desde GitHub.')}")
+    
+    Views.pause()
+    
+    # Exit application to force reload
+    return ActionResult.exit()
+
+
 def create_debug_menu() -> MenuDefinition:
     """
     Creates the debug/diagnostics menu.
@@ -151,6 +241,13 @@ def create_debug_menu() -> MenuDefinition:
                 key='3',
                 label='🔍 Compare Classes vs Categories',
                 action=action_compare_classes_vs_categories
+            ),
+            
+            MenuOption(
+                key='4',
+                label='🔄 Reset Data (Reload from GitHub)',
+                action=action_reset_data,
+                requires_confirm=False  # Ya tiene confirmación interna
             ),
         ],
         parent_menu='main',

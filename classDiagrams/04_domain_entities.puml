@@ -1,0 +1,138 @@
+@startuml Domain Entities
+title Hot Dog CCS - Domain Entities (Generated Classes)
+
+' Base Entity
+class Entity {
+    + id: str
+    + entity_type: str
+    + to_dict(): dict
+    + from_dict(data): Entity
+    + validate(): bool
+}
+
+' Ingredient Base (intermediate)
+class Ingredient {
+    + nombre: str
+    + validate(): bool
+}
+
+' Ingredient Concrete Classes
+class Pan {
+    + tipo: str
+    + tamano: int
+    + unidad: str
+    + stock: int
+    + validate(): bool
+}
+
+class Salchicha {
+    + tipo: str
+    + tamano: int
+    + unidad: str
+    + stock: int
+    + matches_size(other): bool
+    + validate(): bool
+}
+
+class Toppings {
+    + tipo: str
+    + presentacion: str
+    + stock: int
+    + validate(): bool
+}
+
+class Salsa {
+    + base: str
+    + color: str
+    + stock: int
+    + validate(): bool
+}
+
+class Acompanante {
+    + tipo: str
+    + tamano: int
+    + unidad: str
+    + stock: int
+    + validate(): bool
+}
+
+' HotDog
+class HotDog {
+    + nombre: str
+    + pan: dict
+    + salchicha: dict
+    + toppings: List[dict]
+    + salsas: List[dict]
+    + acompanante: dict
+    + has_toppings(): bool
+    + has_salsas(): bool
+    + is_combo(): bool
+    + validate(): bool
+}
+
+' Venta
+class Venta {
+    + fecha: str
+    + items: List[dict]
+    + validate(): bool
+}
+
+class VentaItem <<embedded>> {
+    + hotdog_id: str
+    + hotdog_nombre: str
+    + cantidad: int
+}
+
+' Relationships
+Ingredient --|> Entity
+Pan --|> Ingredient
+Salchicha --|> Ingredient
+Toppings --|> Ingredient
+Salsa --|> Ingredient
+Acompanante --|> Ingredient
+
+HotDog --|> Entity
+Venta --|> Entity
+
+HotDog o-- Pan : references
+HotDog o-- Salchicha : references
+HotDog o-- Toppings : references
+HotDog o-- Salsa : references
+HotDog o-- Acompanante : references
+
+Venta *-- VentaItem : contains
+VentaItem o-- HotDog : references
+
+note right of Entity
+  All entities inherit from
+  base Entity class with
+  common functionality
+end note
+
+note right of Ingredient
+  Intermediate base class
+  with common properties
+  for all ingredients
+end note
+
+note bottom of HotDog
+  References to ingredients
+  stored as {id, nombre}
+  for referential integrity
+  and readability
+end note
+
+note bottom of Venta
+  Items are embedded dicts,
+  not separate entities
+  (composition, not aggregation)
+end note
+
+note left of Pan
+  All ingredient classes
+  dynamically generated
+  by EntityFactory using
+  make_dataclass()
+end note
+
+@enduml

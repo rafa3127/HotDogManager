@@ -51,11 +51,11 @@ DATA_DIR = 'data'
 DEFAULT_STOCK_CONFIG = {
     'default_stock': 50,
     'stock_by_category': {
-        'pan': 100,
-        'salchicha': 75,
+        'pan': 1000,
+        'salchicha': 1000,
         'toppings': 200,
-        'salsa': 150,
-        'acompañante': 80
+        'salsa': 200,
+        'acompañante': 1000
     }
 }
 
@@ -145,12 +145,15 @@ def setup_data_source(force_external: bool = False) -> DataSourceClient:
     )
     
     # Initialize ventas manually (no external source, only local file)
-    # If ventas.json doesn't exist, create empty list
+    # Load from local file if exists, otherwise create empty
     try:
-        data_source.get('ventas')
-    except KeyError:
+        ventas_data = data_source._load_local('ventas')
+        data_source._data_store['ventas'] = ventas_data
+        print(f"✅ Initialized ventas (loaded {len(ventas_data)} items from local file)")
+    except FileNotFoundError:
         # ventas.json doesn't exist yet, create it with empty array
         data_source.save('ventas', [])
+        print("✅ Initialized ventas (created new empty file)")
     
     print("✅ Data sources ready!")
     return data_source

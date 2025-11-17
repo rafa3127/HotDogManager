@@ -79,9 +79,9 @@ Construir la interfaz de usuario con un sistema de routing que abstraiga la nave
 Implementar la lógica de simulación de un día de ventas con valores aleatorios.
 
 ### Tareas
-- [ ] Servicio de simulación con generación de clientes y órdenes aleatorias
-- [ ] Validación de inventario y procesamiento de ventas
-- [ ] Cálculo de métricas del día (clientes perdidos, más vendido, etc.)
+- [x] Servicio de simulación con generación de clientes y órdenes aleatorias
+- [x] Validación de inventario y procesamiento de ventas
+- [x] Cálculo de métricas del día (clientes perdidos, más vendido, etc.)
 
 ---
 

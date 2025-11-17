@@ -31,6 +31,15 @@ from .ventas_actions import (
     action_simulate_day,
 )
 
+from .reporting_actions import (
+    action_generate_all_charts,
+    action_sales_over_time_chart,
+    action_top_hotdogs_chart,
+    action_sales_by_hour_chart,
+    action_compare_dates_chart,
+    action_general_report,
+)
+
 __all__ = [
     # Ingredientes
     'action_list_by_category',
@@ -52,4 +61,12 @@ __all__ = [
     'action_view_sales_by_date',
     'action_sales_statistics',
     'action_simulate_day',
+    
+    # Reporting
+    'action_generate_all_charts',
+    'action_sales_over_time_chart',
+    'action_top_hotdogs_chart',
+    'action_sales_by_hour_chart',
+    'action_compare_dates_chart',
+    'action_general_report',
 ]

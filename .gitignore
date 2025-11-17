@@ -42,7 +42,7 @@ Thumbs.db
 data
 
 # Gráficos generados
-data/graficos/
+/charts
 
 # Logs
 *.log
